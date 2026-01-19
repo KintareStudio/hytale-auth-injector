@@ -20,6 +20,8 @@ That's it! No auth server or game server setup needed for testing.
 - **All cosmetics unlocked** - full access to character customization
 - **Cosmetics saved by username** - your skin/cosmetic choices persist between sessions
 
+> **Note**: There is no password authentication - anyone can use any username. If you use a username someone else has used, you'll see their cosmetics. Use a unique username for testing.
+
 ### Build from Source
 
 Alternatively, use the [Hytale-F2P launcher source](https://github.com/sanasol/Hytale-F2P/tree/patched-auth-server) and [hytale-server-docker](https://github.com/sanasol/hytale-server-docker) with default settings - they're pre-configured to use `sanasol.ws`.
