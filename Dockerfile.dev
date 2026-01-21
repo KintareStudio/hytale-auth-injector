@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install unzip for Assets.zip extraction
+RUN apk add --no-cache unzip
+
+# Create directories
+RUN mkdir -p /app/data /app/assets
+
+# Copy package files and install dependencies (including nodemon)
+COPY package.json ./
+RUN npm install
+
+# Copy server code (will be overridden by volume mount for live reload)
+COPY server.js ./
+
+EXPOSE 3000
+
+# Use nodemon for live reload
+CMD ["npx", "nodemon", "--watch", "server.js", "--watch", "*.js", "server.js"]

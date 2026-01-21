@@ -4,9 +4,13 @@
   "description": "Hytale F2P authentication server",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon --watch server.js --watch '*.js' server.js"
   },
   "dependencies": {},
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
   "keywords": ["hytale", "auth"],
   "license": "MIT"
 }

@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hytale Avatar Customizer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 50%, #0d1b2a 100%);
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Main Layout */
+    .layout {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+    }
+
+    /* Left Panel - Customizer */
+    .customizer-panel {
+      width: 520px;
+      min-width: 400px;
+      background: linear-gradient(180deg, rgba(20, 35, 60, 0.95) 0%, rgba(15, 28, 48, 0.98) 100%);
+      border: 1px solid rgba(100, 150, 200, 0.2);
+      border-radius: 8px;
+      margin: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      background: linear-gradient(90deg, rgba(40, 70, 120, 0.6) 0%, rgba(30, 55, 95, 0.4) 100%);
+      padding: 12px 20px;
+      text-align: center;
+      border-bottom: 1px solid rgba(100, 150, 200, 0.3);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .panel-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Category Sidebar */
+    .category-sidebar {
+      width: 60px;
+      background: rgba(10, 20, 35, 0.5);
+      border-right: 1px solid rgba(100, 150, 200, 0.15);
+      display: flex;
+      flex-direction: column;
+      padding: 8px 0;
+    }
+
+    .category-group {
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid rgba(100, 150, 200, 0.1);
+      padding: 4px 0;
+    }
+
+    .category-group:last-child {
+      border-bottom: none;
+    }
+
+    .category-btn {
+      width: 44px;
+      height: 44px;
+      margin: 2px auto;
+      background: rgba(40, 60, 90, 0.3);
+      border: 2px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .category-btn:hover {
+      background: rgba(60, 90, 130, 0.4);
+      border-color: rgba(100, 150, 200, 0.3);
+    }
+
+    .category-btn.active {
+      background: rgba(80, 130, 180, 0.4);
+      border-color: rgba(200, 180, 100, 0.8);
+      box-shadow: 0 0 10px rgba(200, 180, 100, 0.3);
+    }
+
+    .category-btn.group-header {
+      background: rgba(200, 180, 100, 0.2);
+    }
+
+    .category-btn.group-header.active {
+      background: rgba(200, 180, 100, 0.4);
+    }
+
+    .category-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: rgba(200, 200, 220, 0.8);
+    }
+
+    .category-btn.active svg {
+      fill: rgba(255, 240, 200, 1);
+    }
+
+    .category-expand {
+      position: absolute;
+      right: -2px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 8px;
+      color: rgba(200, 200, 220, 0.6);
+    }
+
+    /* Subcategory Sidebar */
+    .subcategory-sidebar {
+      width: 50px;
+      background: rgba(15, 25, 40, 0.5);
+      border-right: 1px solid rgba(100, 150, 200, 0.1);
+      display: flex;
+      flex-direction: column;
+      padding: 8px 4px;
+      overflow-y: auto;
+    }
+
+    .subcategory-btn {
+      width: 40px;
+      height: 40px;
+      margin: 2px auto;
+      background: rgba(40, 60, 90, 0.2);
+      border: 2px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .subcategory-btn:hover {
+      background: rgba(60, 90, 130, 0.3);
+    }
+
+    .subcategory-btn.active {
+      background: rgba(80, 130, 180, 0.4);
+      border-color: rgba(100, 180, 220, 0.6);
+    }
+
+    .subcategory-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: rgba(180, 180, 200, 0.7);
+    }
+
+    .subcategory-btn.active svg {
+      fill: rgba(220, 240, 255, 1);
+    }
+
+    /* Main Content Area */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: rgba(180, 200, 220, 0.8);
+    }
+
+    .breadcrumb-item {
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .breadcrumb-separator {
+      color: rgba(100, 150, 200, 0.5);
+    }
+
+    .search-box {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(20, 35, 55, 0.6);
+      border: 1px solid rgba(100, 150, 200, 0.2);
+      border-radius: 4px;
+      padding: 8px 12px 8px 32px;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: rgba(100, 180, 220, 0.5);
+    }
+
+    .search-input::placeholder {
+      color: rgba(150, 170, 190, 0.5);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      fill: rgba(150, 170, 190, 0.5);
+    }
+
+    /* Style Grid */
+    .style-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 8px;
+      overflow-y: auto;
+      padding-right: 8px;
+      margin-bottom: 12px;
+    }
+
+    .style-grid::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .style-grid::-webkit-scrollbar-track {
+      background: rgba(20, 35, 55, 0.4);
+      border-radius: 3px;
+    }
+
+    .style-grid::-webkit-scrollbar-thumb {
+      background: rgba(80, 120, 160, 0.5);
+      border-radius: 3px;
+    }
+
+    .style-item {
+      aspect-ratio: 1;
+      background: rgba(30, 50, 75, 0.5);
+      border: 2px solid rgba(60, 90, 130, 0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      transition: all 0.2s;
+    }
+
+    .style-item:hover {
+      border-color: rgba(100, 150, 200, 0.5);
+      transform: scale(1.02);
+    }
+
+    .style-item.selected {
+      border-color: rgba(200, 220, 150, 0.9);
+      box-shadow: 0 0 12px rgba(200, 220, 150, 0.3);
+    }
+
+    .style-item.none-option {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(40, 55, 75, 0.6);
+    }
+
+    .style-item.none-option svg {
+      width: 32px;
+      height: 32px;
+      fill: rgba(150, 170, 190, 0.6);
+    }
+
+    .style-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      background: rgba(60, 80, 100, 0.3);
+    }
+
+    .thumbnail-placeholder {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(60, 80, 100, 0.5) 0%, rgba(40, 60, 80, 0.5) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .thumbnail-placeholder::after {
+      content: '?';
+      font-size: 24px;
+      color: rgba(150, 170, 190, 0.5);
+    }
+
+    .style-item .style-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.7);
+      font-size: 9px;
+      padding: 2px 4px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .style-check {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: 16px;
+      height: 16px;
+      background: rgba(100, 200, 150, 0.9);
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .style-item.selected .style-check {
+      display: flex;
+    }
+
+    .style-check svg {
+      width: 10px;
+      height: 10px;
+      fill: #fff;
+    }
+
+    /* Color Section */
+    .color-section {
+      border-top: 1px solid rgba(100, 150, 200, 0.15);
+      padding-top: 12px;
+    }
+
+    .color-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(180, 200, 220, 0.7);
+      margin-bottom: 8px;
+    }
+
+    .color-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .color-swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid rgba(60, 90, 130, 0.4);
+      transition: all 0.2s;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.1);
+      border-color: rgba(150, 180, 220, 0.6);
+    }
+
+    .color-swatch.selected {
+      border-color: rgba(255, 220, 100, 0.9);
+      box-shadow: 0 0 8px rgba(255, 220, 100, 0.4);
+    }
+
+    /* Right Panel - Preview */
+    .preview-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      padding-left: 0;
+    }
+
+    .preview-container {
+      flex: 1;
+      background: radial-gradient(ellipse at center bottom, rgba(40, 80, 60, 0.3) 0%, transparent 60%),
+                  linear-gradient(180deg, rgba(20, 40, 60, 0.3) 0%, rgba(10, 25, 40, 0.5) 100%);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 20, 35, 0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .loading-overlay.hidden {
+      display: none;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(100, 150, 200, 0.2);
+      border-top-color: rgba(100, 180, 220, 0.8);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      font-size: 13px;
+      color: rgba(180, 200, 220, 0.8);
+    }
+
+    /* Bottom Controls */
+    .bottom-controls {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .control-btn {
+      width: 40px;
+      height: 40px;
+      background: rgba(40, 60, 90, 0.5);
+      border: 1px solid rgba(100, 150, 200, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .control-btn:hover {
+      background: rgba(60, 90, 130, 0.5);
+    }
+
+    .control-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: rgba(200, 200, 220, 0.8);
+    }
+
+    .action-btn {
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+    }
+
+    .btn-discard {
+      background: rgba(60, 80, 110, 0.6);
+      border: 1px solid rgba(100, 150, 200, 0.3);
+      color: rgba(200, 210, 220, 0.9);
+    }
+
+    .btn-discard:hover {
+      background: rgba(80, 100, 130, 0.6);
+    }
+
+    .btn-save {
+      background: linear-gradient(180deg, rgba(80, 140, 200, 0.8) 0%, rgba(60, 110, 170, 0.8) 100%);
+      border: 1px solid rgba(120, 180, 220, 0.5);
+      color: #fff;
+    }
+
+    .btn-save:hover {
+      background: linear-gradient(180deg, rgba(100, 160, 220, 0.9) 0%, rgba(80, 130, 190, 0.9) 100%);
+    }
+
+    /* Animation Controls */
+    .animation-select {
+      background: rgba(40, 60, 90, 0.5);
+      border: 1px solid rgba(100, 150, 200, 0.3);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-right: auto;
+    }
+
+    .animation-select:focus {
+      outline: none;
+      border-color: rgba(100, 180, 220, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Customizer Panel -->
+    <div class="customizer-panel">
+      <div class="panel-header">Customize Avatar</div>
+      <div class="panel-content">
+        <!-- Main Category Sidebar -->
+        <div class="category-sidebar" id="category-sidebar">
+          <!-- Categories will be populated by JS -->
+        </div>
+
+        <!-- Subcategory Sidebar -->
+        <div class="subcategory-sidebar" id="subcategory-sidebar">
+          <!-- Subcategories will be populated by JS -->
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+          <div class="breadcrumb">
+            <span class="breadcrumb-item" id="breadcrumb-category">HEAD</span>
+            <span class="breadcrumb-separator">&#9656;</span>
+            <span class="breadcrumb-item" id="breadcrumb-subcategory">EYES</span>
+          </div>
+
+          <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 24 24">
+              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <input type="text" class="search-input" placeholder="Search" id="search-input">
+          </div>
+
+          <div class="style-grid" id="style-grid">
+            <!-- Style items will be populated by JS -->
+          </div>
+
+          <div class="color-section" id="color-section">
+            <div class="color-label">COLOR</div>
+            <div class="color-grid" id="color-grid">
+              <!-- Colors will be populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview Panel -->
+    <div class="preview-panel">
+      <div class="preview-container">
+        <div id="canvas-container"></div>
+        <div class="loading-overlay" id="loading-overlay">
+          <div class="spinner"></div>
+          <div class="loading-text" id="loading-text">Loading avatar...</div>
+        </div>
+      </div>
+
+      <div class="bottom-controls">
+        <select class="animation-select" id="animation-select">
+          <option value="">No Animation</option>
+          <option value="Default/Idle" selected>Idle</option>
+          <option value="Default/Walk">Walk</option>
+          <option value="Default/Run">Run</option>
+          <option value="Default/Sprint">Sprint</option>
+          <option value="Default/Jump">Jump</option>
+          <option value="Default/Fall">Fall</option>
+          <option value="Default/Crouch">Crouch</option>
+          <option value="Emote/Wave">Wave</option>
+          <option value="Emote/Dab_Left">Dab Left</option>
+          <option value="Emote/Dab_Right">Dab Right</option>
+          <option value="Taunt/Laugh">Laugh</option>
+          <option value="Taunt/Chicken">Chicken</option>
+          <option value="Poses/Sword">Sword Pose</option>
+          <option value="Poses/Staff">Staff Pose</option>
+          <option value="Swim/Swim">Swim</option>
+          <option value="Glide/Glide">Glide</option>
+        </select>
+
+        <button class="control-btn" id="btn-rotate-left" title="Rotate Left">
+          <svg viewBox="0 0 24 24"><path d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/></svg>
+        </button>
+        <button class="control-btn" id="btn-rotate-right" title="Rotate Right">
+          <svg viewBox="0 0 24 24"><path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.05 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11c-.17-1.39-.72-2.73-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42l1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z"/></svg>
+        </button>
+        <button class="control-btn" id="btn-reset" title="Reset View">
+          <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        </button>
+        <button class="control-btn" id="btn-randomize" title="Randomize">
+          <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+        </button>
+
+        <button class="action-btn btn-discard" id="btn-discard">Discard Changes</button>
+        <button class="action-btn btn-save" id="btn-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="/assets/avatar.js"></script>
+  <script>
+    // Category definitions matching Hytale's structure
+    const CATEGORIES = {
+      head: {
+        name: 'Head',
+        icon: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>`,
+        subcategories: {
+          eyes: { name: 'Eyes', key: 'eyes', icon: `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>` },
+          eyebrows: { name: 'Eyebrows', key: 'eyebrows', icon: `<svg viewBox="0 0 24 24"><path d="M4 15h16v2H4v-2zm0-4h16v2H4v-2z"/></svg>` },
+          haircut: { name: 'Haircut', key: 'haircut', icon: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>` },
+          face: { name: 'Face', key: 'face', icon: `<svg viewBox="0 0 24 24"><path d="M9 11.75c-.69 0-1.25.56-1.25 1.25s.56 1.25 1.25 1.25 1.25-.56 1.25-1.25-.56-1.25-1.25-1.25zm6 0c-.69 0-1.25.56-1.25 1.25s.56 1.25 1.25 1.25 1.25-.56 1.25-1.25-.56-1.25-1.25-1.25zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>` },
+          facialHair: { name: 'Facial Hair', key: 'facialHair', icon: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.82.62-3.49 1.64-4.83 1.43 1.63 4.04 3.35 6.36 3.83 2.32-.48 4.93-2.2 6.36-3.83C19.38 8.51 20 10.18 20 12c0 4.41-3.59 8-8 8z"/></svg>` },
+          mouth: { name: 'Mouth', key: 'mouth', icon: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-6c.78 2.34 2.72 4 5 4s4.22-1.66 5-4H7z"/></svg>` },
+          ears: { name: 'Ears', key: 'ears', icon: `<svg viewBox="0 0 24 24"><path d="M17 20c-.29 0-.56-.06-.76-.15-.71-.37-1.21-.88-1.71-2.38-.51-1.56-1.47-2.29-2.39-3-.79-.61-1.61-1.24-2.32-2.53C9.29 10.98 9 9.93 9 9c0-2.8 2.2-5 5-5s5 2.2 5 5h2c0-3.93-3.07-7-7-7S7 5.07 7 9c0 1.26.38 2.65 1.07 3.9.91 1.65 1.98 2.48 2.85 3.15.81.62 1.39 1.07 1.71 2.05.6 1.82 1.37 2.84 2.73 3.55A3.999 3.999 0 0 0 21 18h-2c0 1.1-.9 2-2 2zM7.64 2.64L6.22 1.22C4.23 3.21 3 5.96 3 9s1.23 5.79 3.22 7.78l1.41-1.41C6.01 13.74 5 11.49 5 9s1.01-4.74 2.64-6.36zM11.5 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0-5 0z"/></svg>` },
+          headAccessory: { name: 'Head Accessory', key: 'headAccessory', icon: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>` },
+          faceAccessory: { name: 'Face Accessory', key: 'faceAccessory', icon: `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>` },
+          earAccessory: { name: 'Ear Accessory', key: 'earAccessory', icon: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>` }
+        }
+      },
+      torso: {
+        name: 'Torso',
+        icon: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4 6h-4v2h4v2h-4v2h4v2H9V7h6v2z"/></svg>`,
+        subcategories: {
+          undertop: { name: 'Undertop', key: 'undertop', icon: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>` },
+          overtop: { name: 'Overtop', key: 'overtop', icon: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>` }
+        }
+      },
+      arms: {
+        name: 'Arms',
+        icon: `<svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`,
+        subcategories: {
+          gloves: { name: 'Gloves', key: 'gloves', icon: `<svg viewBox="0 0 24 24"><path d="M18 4V3c0-.55-.45-1-1-1H5c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1h12c.55 0 1-.45 1-1V6h1v4H9v11c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-9h8V4h-3z"/></svg>` }
+        }
+      },
+      legs: {
+        name: 'Legs',
+        icon: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>`,
+        subcategories: {
+          pants: { name: 'Pants', key: 'pants', icon: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>` },
+          overpants: { name: 'Overpants', key: 'overpants', icon: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>` },
+          shoes: { name: 'Shoes', key: 'shoes', icon: `<svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5H15V7h-3V5H9.5C8.84 5 8.29 5.42 8.08 6.01L6 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99z"/></svg>` }
+        }
+      },
+      general: {
+        name: 'General',
+        icon: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`,
+        subcategories: {
+          underwear: { name: 'Underwear', key: 'underwear', icon: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>` },
+          skinTone: { name: 'Skin Tone', key: 'skinTone', icon: `<svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8z"/></svg>` }
+        }
+      },
+      capes: {
+        name: 'Capes',
+        icon: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>`,
+        subcategories: {
+          cape: { name: 'Capes', key: 'cape', icon: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/></svg>` }
+        }
+      }
+    };
+
+    // Current state
+    let currentCategory = 'head';
+    let currentSubcategory = 'eyes';
+    let currentSkin = {};
+    let currentColors = {};
+    let originalSkin = {};
+    let originalColors = {};
+    let cosmeticItems = {};
+    let viewer = null;
+    let refreshDebounce = null;
+
+    // Get UUID from URL or generate test one
+    function getUUID() {
+      const pathParts = window.location.pathname.split('/');
+      const idx = pathParts.indexOf('customizer');
+      if (idx >= 0 && pathParts[idx + 1]) {
+        return pathParts[idx + 1];
+      }
+      return 'test-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    const UUID = getUUID();
+
+    // Initialize
+    async function init() {
+      setupCategories();
+      setupControls();
+      await loadCosmeticItems();
+      await initViewer();
+      selectCategory('head');
+      selectSubcategory('eyes');
+    }
+
+    function setupCategories() {
+      const sidebar = document.getElementById('category-sidebar');
+      sidebar.innerHTML = '';
+
+      for (const [key, category] of Object.entries(CATEGORIES)) {
+        const group = document.createElement('div');
+        group.className = 'category-group';
+
+        const btn = document.createElement('button');
+        btn.className = 'category-btn group-header';
+        btn.dataset.category = key;
+        btn.innerHTML = category.icon;
+        btn.onclick = () => selectCategory(key);
+
+        // Add expand indicator if has subcategories
+        if (Object.keys(category.subcategories).length > 1) {
+          const expand = document.createElement('span');
+          expand.className = 'category-expand';
+          expand.textContent = '▶';
+          btn.appendChild(expand);
+        }
+
+        group.appendChild(btn);
+        sidebar.appendChild(group);
+      }
+    }
+
+    function selectCategory(categoryKey) {
+      currentCategory = categoryKey;
+      const category = CATEGORIES[categoryKey];
+
+      // Update active state
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.category === categoryKey);
+      });
+
+      // Update subcategory sidebar
+      const subSidebar = document.getElementById('subcategory-sidebar');
+      subSidebar.innerHTML = '';
+
+      for (const [subKey, sub] of Object.entries(category.subcategories)) {
+        const btn = document.createElement('button');
+        btn.className = 'subcategory-btn';
+        btn.dataset.subcategory = subKey;
+        btn.innerHTML = sub.icon;
+        btn.title = sub.name;
+        btn.onclick = () => selectSubcategory(subKey);
+        subSidebar.appendChild(btn);
+      }
+
+      // Select first subcategory
+      const firstSub = Object.keys(category.subcategories)[0];
+      selectSubcategory(firstSub);
+    }
+
+    function selectSubcategory(subKey) {
+      currentSubcategory = subKey;
+      const category = CATEGORIES[currentCategory];
+      const subcategory = category.subcategories[subKey];
+
+      // Update active state
+      document.querySelectorAll('.subcategory-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.subcategory === subKey);
+      });
+
+      // Update breadcrumb
+      document.getElementById('breadcrumb-category').textContent = category.name.toUpperCase();
+      document.getElementById('breadcrumb-subcategory').textContent = subcategory.name.toUpperCase();
+
+      // Load styles for this subcategory
+      loadStylesForCategory(subcategory.key);
+      loadColorsForCategory(subcategory.key);
+    }
+
+    async function loadCosmeticItems() {
+      try {
+        const response = await fetch('/cosmetics/list');
+        if (response.ok) {
+          cosmeticItems = await response.json();
+          console.log('Loaded cosmetics:', Object.keys(cosmeticItems));
+        }
+      } catch (e) {
+        console.log('Could not load cosmetics list:', e);
+        cosmeticItems = {};
+      }
+    }
+
+    function loadStylesForCategory(categoryKey) {
+      const grid = document.getElementById('style-grid');
+      grid.innerHTML = '';
+
+      const selectedId = currentSkin[categoryKey];
+
+      // Add "None" option
+      const noneItem = document.createElement('div');
+      noneItem.className = 'style-item none-option';
+      if (!selectedId) noneItem.classList.add('selected');
+      noneItem.innerHTML = `
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        <div class="style-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+      `;
+      noneItem.onclick = () => selectStyle(categoryKey, null);
+      grid.appendChild(noneItem);
+
+      // Get items for this category (array of objects with id, name, thumbnail, colors)
+      const items = cosmeticItems[categoryKey] || [];
+
+      for (const itemData of items) {
+        const item = document.createElement('div');
+        item.className = 'style-item';
+        item.dataset.id = itemData.id;
+        item.dataset.name = itemData.name || itemData.id;
+        item.dataset.category = categoryKey;
+
+        if (selectedId === itemData.id) {
+          item.classList.add('selected');
+        }
+
+        // Display name (clean up the ID for display)
+        const displayName = itemData.id.replace(/_/g, ' ');
+
+        // Create thumbnail from texture image
+        let thumbnailHtml = '<div class="thumbnail-placeholder"></div>';
+        if (itemData.thumbnail) {
+          const thumbnailUrl = '/asset/Common/' + itemData.thumbnail;
+          thumbnailHtml = `<img src="${thumbnailUrl}" alt="${displayName}" onerror="this.parentElement.querySelector('.thumbnail-placeholder').style.display='block'; this.style.display='none';">
+            <div class="thumbnail-placeholder" style="display:none"></div>`;
+        }
+
+        item.innerHTML = `
+          ${thumbnailHtml}
+          <div class="style-label">${displayName}</div>
+          <div class="style-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+        `;
+
+        // Store item colors for the color picker (each item has its own colors)
+        item.dataset.colors = JSON.stringify(itemData.colors || []);
+
+        item.onclick = () => selectStyle(categoryKey, itemData.id, itemData.colors);
+        grid.appendChild(item);
+      }
+
+      // If no items, show placeholder
+      if (items.length === 0) {
+        const placeholder = document.createElement('div');
+        placeholder.style.cssText = 'grid-column: 1/-1; text-align: center; padding: 40px 20px; color: rgba(150,170,190,0.5); font-size: 13px;';
+        placeholder.textContent = 'No items available';
+        grid.appendChild(placeholder);
+      }
+    }
+
+    function loadColorsForCategory(categoryKey) {
+      const colorSection = document.getElementById('color-section');
+      const colorGrid = document.getElementById('color-grid');
+
+      // Find the item's available colors
+      const items = cosmeticItems[categoryKey] || [];
+      const selectedId = currentSkin[categoryKey];
+      const selectedItem = items.find(i => i.id === selectedId);
+
+      colorGrid.innerHTML = '';
+
+      // If item has specific colors from gradient set
+      if (selectedItem && selectedItem.colors && selectedItem.colors.length > 0) {
+        colorSection.style.display = 'block';
+
+        const selectedColor = currentColors[categoryKey];
+
+        for (const colorId of selectedItem.colors) {
+          const swatch = document.createElement('div');
+          swatch.className = 'color-swatch';
+          swatch.title = colorId;
+
+          // Try to get color from gradient texture or use ID as hint
+          // For now use a simple color mapping
+          const colorHex = getColorForId(colorId, categoryKey);
+          swatch.style.backgroundColor = colorHex;
+
+          if (colorId === selectedColor) {
+            swatch.classList.add('selected');
+          }
+
+          swatch.onclick = () => selectColor(categoryKey, colorId);
+          colorGrid.appendChild(swatch);
+        }
+      } else {
+        // No colors available for this category
+        colorSection.style.display = 'none';
+      }
+    }
+
+    // Map color IDs to approximate hex values
+    function getColorForId(colorId, categoryKey) {
+      // Common color mappings
+      const colorMap = {
+        // Hair colors
+        'Black': '#1a1a1a', 'DarkBrown': '#2d1b0e', 'Brown': '#4a3728', 'LightBrown': '#8b4513',
+        'Auburn': '#a52a2a', 'Ginger': '#d2691e', 'Blonde': '#daa520', 'LightBlonde': '#ffd700',
+        'White': '#f5f5f5', 'Gray': '#808080', 'Red': '#dc143c', 'Pink': '#ff69b4',
+        'Purple': '#9370db', 'Blue': '#4169e1', 'Green': '#32cd32', 'Teal': '#00ced1',
+        // Skin tones
+        '01': '#f4c39a', '02': '#f5c490', '03': '#e0ae72', '04': '#ba7f5b', '05': '#945d44',
+        '06': '#6f3b2c', '07': '#4f2a24', '08': '#dcc7a8', '19': '#8aacfb', '20': '#a78af1',
+        // Eyes
+        'Brown_Eye': '#654321', 'Blue_Eye': '#4682b4', 'Green_Eye': '#228b22', 'Hazel': '#8b7355',
+        // Generic
+        'Default': '#888888'
+      };
+
+      return colorMap[colorId] || '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+    }
+
+    function selectStyle(categoryKey, itemId, availableColors = null) {
+      if (itemId === null) {
+        delete currentSkin[categoryKey];
+        delete currentColors[categoryKey];
+      } else {
+        currentSkin[categoryKey] = itemId;
+
+        // Auto-select first color if available and no color selected
+        if (availableColors && availableColors.length > 0 && !currentColors[categoryKey]) {
+          currentColors[categoryKey] = availableColors[0];
+        }
+      }
+
+      // Update UI
+      loadStylesForCategory(categoryKey);
+      loadColorsForCategory(categoryKey);
+
+      // Refresh preview with debounce
+      scheduleRefresh();
+    }
+
+    function selectColor(categoryKey, colorId) {
+      currentColors[categoryKey] = colorId;
+
+      // Update UI
+      loadColorsForCategory(categoryKey);
+
+      // Refresh preview
+      scheduleRefresh();
+    }
+
+    function scheduleRefresh() {
+      // Debounce refresh to avoid too many reloads
+      if (refreshDebounce) clearTimeout(refreshDebounce);
+      refreshDebounce = setTimeout(() => refreshPreview(), 100);
+    }
+
+    async function initViewer() {
+      const container = document.getElementById('canvas-container');
+
+      viewer = new HytaleAvatarViewer(container, {
+        autoRotate: true,
+        showGrid: true,
+        onLoadProgress: (text) => {
+          document.getElementById('loading-text').textContent = text;
+        },
+        onLoadComplete: () => {
+          document.getElementById('loading-overlay').classList.add('hidden');
+        },
+        onError: (err) => {
+          document.getElementById('loading-text').textContent = 'Error: ' + err.message;
+          console.error('Viewer error:', err);
+        }
+      });
+
+      viewer.init();
+
+      try {
+        await viewer.loadAvatar(UUID);
+        // Store original skin for discard
+        if (viewer.modelData && viewer.modelData.raw) {
+          originalSkin = { ...viewer.modelData.raw };
+          currentSkin = { ...viewer.modelData.raw };
+          // Parse colors from raw data (format: "ItemId.ColorId")
+          for (const [key, value] of Object.entries(currentSkin)) {
+            if (typeof value === 'string' && value.includes('.')) {
+              const [id, ...colorParts] = value.split('.');
+              currentSkin[key] = id;
+              currentColors[key] = colorParts.join('.');
+            }
+          }
+          originalColors = { ...currentColors };
+        }
+      } catch (e) {
+        console.error('Failed to load avatar:', e);
+        // Still allow customization even if initial load fails
+        document.getElementById('loading-overlay').classList.add('hidden');
+      }
+    }
+
+    async function refreshPreview() {
+      console.log('Refreshing preview with skin:', currentSkin, 'colors:', currentColors);
+
+      // Show loading
+      document.getElementById('loading-overlay').classList.remove('hidden');
+      document.getElementById('loading-text').textContent = 'Updating preview...';
+
+      try {
+        // Build skin data string for preview
+        const previewSkin = {};
+        for (const [key, itemId] of Object.entries(currentSkin)) {
+          const colorId = currentColors[key];
+          previewSkin[key] = colorId ? `${itemId}.${colorId}` : itemId;
+        }
+
+        // Post updated skin to server and get resolved model
+        const response = await fetch(`/avatar/${UUID}/preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(previewSkin)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Clear and rebuild the character
+          while (viewer.character.children.length > 0) {
+            viewer.character.remove(viewer.character.children[0]);
+          }
+          viewer.originalTransforms.clear();
+          viewer.hiddenBodyParts.clear();
+          viewer.polygonOffsetParts.clear();
+          viewer.textureCache.clear();
+
+          viewer.modelData = data;
+          viewer._determineHiddenParts(data);
+          await viewer._buildCharacter(data);
+        } else {
+          console.error('Preview update failed:', await response.text());
+        }
+      } catch (e) {
+        console.error('Preview error:', e);
+      }
+
+      document.getElementById('loading-overlay').classList.add('hidden');
+    }
+
+    function setupControls() {
+      document.getElementById('animation-select').addEventListener('change', (e) => {
+        if (viewer) viewer.setAnimation(e.target.value);
+      });
+
+      document.getElementById('btn-rotate-left').onclick = () => {
+        if (viewer) viewer.rotate(-0.3);
+      };
+
+      document.getElementById('btn-rotate-right').onclick = () => {
+        if (viewer) viewer.rotate(0.3);
+      };
+
+      document.getElementById('btn-reset').onclick = () => {
+        if (viewer) viewer.resetView();
+      };
+
+      document.getElementById('btn-randomize').onclick = () => {
+        randomizeSkin();
+      };
+
+      document.getElementById('btn-discard').onclick = () => {
+        currentSkin = { ...originalSkin };
+        currentColors = { ...originalColors };
+        const category = CATEGORIES[currentCategory];
+        const subcategory = category.subcategories[currentSubcategory];
+        loadStylesForCategory(subcategory.key);
+        loadColorsForCategory(subcategory.key);
+        scheduleRefresh();
+      };
+
+      document.getElementById('btn-save').onclick = async () => {
+        await saveSkin();
+      };
+
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        filterStyles(e.target.value);
+      });
+    }
+
+    function filterStyles(query) {
+      const items = document.querySelectorAll('.style-item:not(.none-option)');
+      const lowerQuery = query.toLowerCase();
+
+      items.forEach(item => {
+        const name = (item.dataset.name || item.dataset.id || '').toLowerCase();
+        const id = (item.dataset.id || '').toLowerCase();
+        const matches = name.includes(lowerQuery) || id.includes(lowerQuery);
+        item.style.display = matches ? '' : 'none';
+      });
+    }
+
+    function randomizeSkin() {
+      for (const [catKey, category] of Object.entries(CATEGORIES)) {
+        for (const [subKey, sub] of Object.entries(category.subcategories)) {
+          const items = cosmeticItems[sub.key] || [];
+          if (items.length > 0 && Math.random() > 0.3) {
+            const randomItem = items[Math.floor(Math.random() * items.length)];
+            currentSkin[sub.key] = randomItem.id;
+            // Pick random color if available
+            if (randomItem.colors && randomItem.colors.length > 0) {
+              currentColors[sub.key] = randomItem.colors[Math.floor(Math.random() * randomItem.colors.length)];
+            }
+          } else if (Math.random() > 0.7) {
+            delete currentSkin[sub.key];
+            delete currentColors[sub.key];
+          }
+        }
+      }
+
+      const category = CATEGORIES[currentCategory];
+      const subcategory = category.subcategories[currentSubcategory];
+      loadStylesForCategory(subcategory.key);
+      loadColorsForCategory(subcategory.key);
+      scheduleRefresh();
+    }
+
+    async function saveSkin() {
+      // Build final skin data
+      const saveSkin = {};
+      for (const [key, itemId] of Object.entries(currentSkin)) {
+        const colorId = currentColors[key];
+        saveSkin[key] = colorId ? `${itemId}.${colorId}` : itemId;
+      }
+
+      try {
+        const response = await fetch(`/account-data/skin/${UUID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(saveSkin)
+        });
+
+        if (response.ok) {
+          originalSkin = { ...currentSkin };
+          originalColors = { ...currentColors };
+          alert('Skin saved successfully!');
+        } else {
+          alert('Failed to save skin: ' + await response.text());
+        }
+      } catch (e) {
+        console.error('Save error:', e);
+        alert('Failed to save skin: ' + e.message);
+      }
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>

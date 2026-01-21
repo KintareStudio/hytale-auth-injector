@@ -2,10 +2,18 @@
 #
 # For local development or when using an external reverse proxy
 # The server runs on port 3000
+#
+# Usage:
+#   Development with live reload:  docker compose -f compose.simple.yaml up
+#   Production:                    docker compose -f compose.simple.yaml --profile prod up
+#
+# Live reload watches server.js for changes and auto-restarts
 
 services:
   hytale-auth:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     environment:
       # IMPORTANT: Your domain must be exactly 10 characters (same as hytale.com)
       DOMAIN: "sanasol.ws"
@@ -17,4 +25,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./assets:/app/assets
+      # Mount source code for live reload
+      - ./server.js:/app/server.js:ro
     restart: unless-stopped
