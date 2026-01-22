@@ -87,22 +87,19 @@ async function handleAdminServers(req, res, url) {
 }
 
 /**
- * Set server name endpoint
+ * Search players by username or UUID (server-side)
  */
-async function handleSetServerName(req, res, body) {
-  const { audience, name } = body;
+async function handlePlayerSearch(req, res, url) {
+  const query = url.searchParams.get('q') || '';
+  const limit = Math.min(parseInt(url.searchParams.get('limit')) || 50, 100);
 
-  if (!audience || !name) {
-    sendJson(res, 400, { error: 'Missing audience or name' });
+  if (!query || query.length < 2) {
+    sendJson(res, 200, { results: [], query: '' });
     return;
   }
 
-  const success = await storage.setServerName(audience, name);
-  if (success) {
-    sendJson(res, 200, { success: true, audience, name });
-  } else {
-    sendJson(res, 500, { error: 'Failed to set server name' });
-  }
+  const results = await storage.searchPlayers(query, limit);
+  sendJson(res, 200, { results, query });
 }
 
 /**
@@ -447,6 +444,66 @@ function handleAdminDashboard(req, res) {
       background: rgba(255, 100, 100, 0.3);
     }
     .hidden { display: none !important; }
+    .search-result {
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .search-result .player-info-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .search-result .player-avatar-large {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+      border: none;
+    }
+    .search-result .player-details h3 {
+      margin: 0;
+      color: #00d4ff;
+      font-size: 1.1em;
+    }
+    .search-result .player-details .uuid-full {
+      color: #888;
+      font-size: 0.8em;
+      font-family: monospace;
+    }
+    .search-result .server-list {
+      margin-top: 10px;
+      padding-left: 15px;
+    }
+    .search-result .server-item {
+      color: #aaa;
+      font-size: 0.9em;
+      margin: 5px 0;
+    }
+    .search-result .server-item .server-link {
+      color: #00d4ff;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .search-no-results {
+      color: #888;
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+    }
+    .search-loading {
+      color: #00d4ff;
+      text-align: center;
+      padding: 15px;
+    }
+    .highlight {
+      background: rgba(0, 212, 255, 0.3);
+      border-color: rgba(0, 212, 255, 0.5);
+    }
   </style>
 </head>
 <body>
@@ -508,24 +565,17 @@ function handleAdminDashboard(req, res) {
     </div>
 
     <div class="section">
-      <h2>Active Servers</h2>
-      <div id="serversList">Loading...</div>
+      <h2>Player Search</h2>
+      <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+        <input type="text" id="playerSearch" placeholder="Search by username or UUID..." style="flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #1a1a2e; color: #fff; font-size: 1em;">
+        <button class="refresh-btn" style="padding: 10px 20px;" onclick="clearSearch()">Clear</button>
+      </div>
+      <div id="searchResults" class="hidden"></div>
     </div>
 
     <div class="section">
-      <h2>Set Server Name</h2>
-      <form id="serverNameForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
-        <div style="flex: 1; min-width: 200px;">
-          <label style="display: block; margin-bottom: 5px; color: #888; font-size: 0.9em;">Server ID (audience)</label>
-          <input type="text" id="serverAudience" placeholder="e.g. abc123-..." style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #1a1a2e; color: #fff;" required>
-        </div>
-        <div style="flex: 1; min-width: 150px;">
-          <label style="display: block; margin-bottom: 5px; color: #888; font-size: 0.9em;">Display Name</label>
-          <input type="text" id="serverDisplayName" placeholder="e.g. Main Server" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #1a1a2e; color: #fff;" required>
-        </div>
-        <button type="submit" class="refresh-btn" style="padding: 10px 20px;">Set Name</button>
-      </form>
-      <div id="serverNameResult" style="margin-top: 10px; font-size: 0.9em;"></div>
+      <h2>Active Servers</h2>
+      <div id="serversList">Loading...</div>
     </div>
 
     <div style="text-align: center; margin-top: 20px;">
@@ -812,44 +862,127 @@ function handleAdminDashboard(req, res) {
       loadServers(page);
     }
 
+    // Player search functionality (server-side)
+    let searchTimeout = null;
+    let lastSearchQuery = '';
+
+    // Perform search via server-side API
+    async function performSearch(query) {
+      const searchResults = document.getElementById('searchResults');
+      query = query.trim();
+      lastSearchQuery = query.toLowerCase();
+
+      if (!query || query.length < 2) {
+        searchResults.classList.add('hidden');
+        searchResults.innerHTML = '';
+        // Remove highlights from server list
+        document.querySelectorAll('.server-card.highlight').forEach(el => el.classList.remove('highlight'));
+        document.querySelectorAll('.player-tag.highlight').forEach(el => el.classList.remove('highlight'));
+        return;
+      }
+
+      searchResults.classList.remove('hidden');
+      searchResults.innerHTML = '<div class="search-loading">Searching...</div>';
+
+      try {
+        const res = await authFetch(\`/admin/search?q=\${encodeURIComponent(query)}&limit=50\`);
+        const data = await res.json();
+        const results = data.results || [];
+
+        if (results.length === 0) {
+          searchResults.innerHTML = '<div class="search-no-results">No players found matching "' + query + '"</div>';
+          return;
+        }
+
+        const html = results.map(player => {
+          const ttlStatus = getTtlStatus(player.ttl || 0);
+          return \`
+            <div class="search-result">
+              <div class="player-info-header">
+                <iframe class="player-avatar-large" src="/avatar/\${player.uuid}/head?bg=black" loading="lazy"></iframe>
+                <div class="player-details">
+                  <h3>\${player.username} <span class="ttl-badge \${ttlStatus.class}">\${ttlStatus.text}</span></h3>
+                  <div class="uuid-full">\${player.uuid}</div>
+                </div>
+              </div>
+              <div class="server-list">
+                <strong>Playing on:</strong>
+                \${player.servers.map(s => \`
+                  <div class="server-item">
+                    <span class="server-link" onclick="scrollToServer('\${s.audience}')">\${s.name}</span>
+                  </div>
+                \`).join('')}
+              </div>
+            </div>
+          \`;
+        }).join('');
+
+        searchResults.innerHTML = html;
+
+        // Highlight matching players in server list
+        highlightMatchingPlayers(lastSearchQuery);
+      } catch (e) {
+        searchResults.innerHTML = '<div class="search-no-results">Search failed: ' + e.message + '</div>';
+      }
+    }
+
+    // Highlight players in the server list that match search
+    function highlightMatchingPlayers(query) {
+      document.querySelectorAll('.server-card.highlight').forEach(el => el.classList.remove('highlight'));
+      document.querySelectorAll('.player-tag.highlight').forEach(el => el.classList.remove('highlight'));
+
+      if (!query) return;
+
+      document.querySelectorAll('.player-tag').forEach(tag => {
+        const name = tag.querySelector('.player-name')?.textContent?.toLowerCase() || '';
+        const uuid = tag.querySelector('.uuid')?.textContent?.toLowerCase() || '';
+        if (name.includes(query) || uuid.includes(query)) {
+          tag.classList.add('highlight');
+          tag.closest('.server-card')?.classList.add('highlight');
+        }
+      });
+    }
+
+    // Scroll to server in list
+    function scrollToServer(audience) {
+      const serverId = 'server-' + audience.replace(/[^a-zA-Z0-9]/g, '');
+      const serverEl = document.getElementById(serverId);
+      if (serverEl) {
+        const card = serverEl.closest('.server-card');
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.style.animation = 'pulse 0.5s ease-out';
+          setTimeout(() => card.style.animation = '', 500);
+        }
+      }
+    }
+
+    // Clear search
+    function clearSearch() {
+      document.getElementById('playerSearch').value = '';
+      performSearch('');
+    }
+
+    // Debounced search input handler
+    document.getElementById('playerSearch').addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => performSearch(e.target.value), 300);
+    });
+
+    // Re-apply highlights after server list reload
+    const originalLoadServers = loadServers;
+    loadServers = async function(page) {
+      await originalLoadServers(page);
+      if (lastSearchQuery) {
+        highlightMatchingPlayers(lastSearchQuery);
+      }
+    };
+
     // Initial load
     refreshData();
 
     // Auto-refresh every 60 seconds
     setInterval(refreshData, 60000);
-
-    // Server name form handler
-    document.getElementById('serverNameForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const audience = document.getElementById('serverAudience').value.trim();
-      const name = document.getElementById('serverDisplayName').value.trim();
-      const resultDiv = document.getElementById('serverNameResult');
-
-      if (!audience || !name) {
-        resultDiv.innerHTML = '<span style="color: #ff6b6b;">Please fill in both fields</span>';
-        return;
-      }
-
-      try {
-        const res = await authFetch('/admin/server-name', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audience, name })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          resultDiv.innerHTML = '<span style="color: #00d4ff;">Server name set successfully!</span>';
-          document.getElementById('serverAudience').value = '';
-          document.getElementById('serverDisplayName').value = '';
-          refreshData();
-        } else {
-          resultDiv.innerHTML = '<span style="color: #ff6b6b;">Error: ' + (data.error || 'Unknown error') + '</span>';
-        }
-      } catch (err) {
-        resultDiv.innerHTML = '<span style="color: #ff6b6b;">Request failed: ' + err.message + '</span>';
-      }
-    });
   </script>
 </body>
 </html>`;
@@ -863,7 +996,7 @@ module.exports = {
   handleActiveSessions,
   handleAdminStats,
   handleAdminServers,
-  handleSetServerName,
+  handlePlayerSearch,
   handlePrerenderQueue,
   handleAdminDashboard,
 };

@@ -624,6 +624,95 @@ async function verifyAdminToken(token) {
   }
 }
 
+/**
+ * Search players by username or UUID
+ * Returns players with their server locations
+ */
+async function searchPlayers(query, limit = 50) {
+  if (!query || !isConnected()) return [];
+
+  query = query.toLowerCase().trim();
+  if (query.length < 2) return []; // Minimum 2 chars
+
+  try {
+    // Get all server keys
+    const serverKeys = await redis.keys(`${KEYS.SERVER_PLAYERS}*`);
+    const results = new Map(); // uuid -> { uuid, username, servers: [] }
+
+    for (const serverKey of serverKeys) {
+      const serverAudience = serverKey.replace(KEYS.SERVER_PLAYERS, '');
+      const playerUuids = await redis.smembers(serverKey);
+
+      for (const uuid of playerUuids) {
+        // Check UUID match first (fast)
+        const uuidMatch = uuid.toLowerCase().includes(query);
+
+        // Get username for this player
+        let username = uuidUsernameCache.get(uuid);
+        if (!username) {
+          username = await redis.get(`${KEYS.USERNAME}${uuid}`);
+          if (username) uuidUsernameCache.set(uuid, username);
+        }
+        username = username || 'Player';
+
+        const nameMatch = username.toLowerCase().includes(query);
+
+        if (uuidMatch || nameMatch) {
+          if (results.has(uuid)) {
+            // Player already found, add this server
+            results.get(uuid).servers.push(serverAudience);
+          } else {
+            // Get TTL for player
+            const ttl = await redis.ttl(`${KEYS.PLAYER_SERVER}${uuid}`);
+
+            results.set(uuid, {
+              uuid,
+              username,
+              ttl: ttl > 0 ? ttl : 0,
+              servers: [serverAudience]
+            });
+
+            // Stop if we hit the limit
+            if (results.size >= limit) break;
+          }
+        }
+      }
+
+      if (results.size >= limit) break;
+    }
+
+    // Convert to array and fetch server names
+    const resultsArray = Array.from(results.values());
+
+    // Get server names for all unique servers
+    const allServerAudiences = new Set();
+    for (const player of resultsArray) {
+      for (const aud of player.servers) {
+        allServerAudiences.add(aud);
+      }
+    }
+
+    const serverNames = new Map();
+    for (const aud of allServerAudiences) {
+      const name = await redis.get(`${KEYS.SERVER_NAME}${aud}`);
+      serverNames.set(aud, name || aud);
+    }
+
+    // Transform servers array to include names
+    for (const player of resultsArray) {
+      player.servers = player.servers.map(aud => ({
+        audience: aud,
+        name: serverNames.get(aud) || aud
+      }));
+    }
+
+    return resultsArray;
+  } catch (e) {
+    console.error('Error searching players:', e.message);
+    return [];
+  }
+}
+
 module.exports = {
   // Sessions
   registerSession,
@@ -652,6 +741,9 @@ module.exports = {
   getKeyCounts,
   getPaginatedServers,
   getAllPlayerUuids,
+
+  // Player search
+  searchPlayers,
 
   // Admin tokens
   createAdminToken,

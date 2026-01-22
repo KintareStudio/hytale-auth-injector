@@ -233,6 +233,12 @@ async function routeRequest(req, res, url, urlPath, body, uuid, name, tokenScope
     return;
   }
 
+  // Avatar debug viewer with toggleable fixes
+  if (urlPath === '/avatar-debug' || urlPath === '/avatar/debug') {
+    routes.avatar.handleAvatarDebugRoute(req, res);
+    return;
+  }
+
   // Protected admin API routes - require token
   if (urlPath.startsWith('/admin/')) {
     const validToken = await middleware.verifyAdminAuth(headers);
@@ -260,9 +266,9 @@ async function routeRequest(req, res, url, urlPath, body, uuid, name, tokenScope
     return;
   }
 
-  // Server name registration
-  if (urlPath === '/admin/server-name' && req.method === 'POST') {
-    await routes.admin.handleSetServerName(req, res, body);
+  // Player search API
+  if (urlPath === '/admin/search') {
+    await routes.admin.handlePlayerSearch(req, res, url);
     return;
   }
 

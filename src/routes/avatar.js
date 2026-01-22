@@ -654,6 +654,29 @@ function generateAvatarViewerHtml(uuid) {
 }
 
 /**
+ * Serve avatar debug viewer HTML page
+ */
+function handleAvatarDebugRoute(req, res) {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const uuid = url.searchParams.get('uuid') || '03fbfdef-9c4a-4eef-bd10-63fa96427133';
+
+  const debugPath = path.join(__dirname, '../../assets/avatar-debug.html');
+
+  if (fs.existsSync(debugPath)) {
+    let html = fs.readFileSync(debugPath, 'utf8');
+    // Replace default UUID in the HTML with the requested one
+    html = html.replace(
+      "const initialUuid = urlParams.get('uuid') || '03fbfdef-9c4a-4eef-bd10-63fa96427133';",
+      `const initialUuid = urlParams.get('uuid') || '${uuid}';`
+    );
+    sendHtml(res, 200, html);
+    return;
+  }
+
+  sendHtml(res, 404, '<!DOCTYPE html><html><body><h1>Debug viewer not found</h1><p>Missing assets/avatar-debug.html</p></body></html>');
+}
+
+/**
  * Test page for head embed
  */
 async function handleTestHeadPage(req, res) {
@@ -814,6 +837,7 @@ module.exports = {
   handleAvatarPreview,
   handleCustomizerRoute,
   handleTestHeadPage,
+  handleAvatarDebugRoute,
   invalidateHeadCache,
   initHeadCache,
 };

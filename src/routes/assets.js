@@ -2,20 +2,256 @@ const assets = require('../services/assets');
 const { sendJson, sendBinary } = require('../utils/response');
 
 /**
- * Cosmetics list API endpoint
+ * Category to gradient set mapping
+ * This maps which gradient set each category uses by default
+ */
+const CATEGORY_GRADIENT_MAP = {
+  'haircut': 'Hair',
+  'eyebrows': 'Hair',
+  'facialHair': 'Hair',
+  'eyes': 'Eyes_Gradient',
+  'skinTone': 'Skin',
+  'pants': null,  // Uses item-specific Textures or various gradient sets
+  'overtop': null,
+  'undertop': null,
+  'shoes': null,
+  'gloves': null,
+  'cape': null,
+  'headAccessory': null,
+  'faceAccessory': null,
+  'earAccessory': null,
+  'face': null,
+  'mouth': null,
+  'ears': null,
+  'underwear': null,
+  'overpants': null,
+  'bodyCharacteristic': null  // No colors
+};
+
+/**
+ * Build a color hex map from gradient sets
+ */
+function buildColorHexMap(gradientSets) {
+  const colorHexMap = {};
+
+  if (!gradientSets) return colorHexMap;
+
+  for (const gradientSet of gradientSets) {
+    if (!gradientSet.Gradients) continue;
+
+    for (const [colorId, colorData] of Object.entries(gradientSet.Gradients)) {
+      if (colorData.BaseColor && colorData.BaseColor.length > 0) {
+        // Use first base color if array
+        const baseColor = Array.isArray(colorData.BaseColor)
+          ? colorData.BaseColor[0]
+          : colorData.BaseColor;
+        colorHexMap[colorId] = baseColor;
+      }
+    }
+  }
+
+  return colorHexMap;
+}
+
+/**
+ * Get colors for an item based on its gradient set or textures
+ */
+function getItemColors(item, gradientSets) {
+  const colors = [];
+
+  // If item has explicit Textures with color variants
+  if (item.Textures && typeof item.Textures === 'object') {
+    return Object.keys(item.Textures);
+  }
+
+  // If item has Variants (like capes), get colors from the first variant's Textures
+  if (item.Variants) {
+    const firstVariant = Object.values(item.Variants)[0];
+    if (firstVariant) {
+      // Check variant's Textures (for non-greyscale items like skeleton cape)
+      if (firstVariant.Textures && typeof firstVariant.Textures === 'object') {
+        return Object.keys(firstVariant.Textures);
+      }
+      // Check variant's GradientSet (for greyscale items like king cape)
+      if (firstVariant.GreyscaleTexture && item.GradientSet && gradientSets) {
+        const gradientSet = gradientSets.find(g => g.Id === item.GradientSet);
+        if (gradientSet && gradientSet.Gradients) {
+          return Object.keys(gradientSet.Gradients);
+        }
+      }
+    }
+  }
+
+  // If item has a gradient set, get colors from that set
+  if (item.GradientSet && gradientSets) {
+    const gradientSet = gradientSets.find(g => g.Id === item.GradientSet);
+    if (gradientSet && gradientSet.Gradients) {
+      return Object.keys(gradientSet.Gradients);
+    }
+  }
+
+  return colors;
+}
+
+/**
+ * Check if a cosmetic item is complete (has required model and texture files)
+ * Returns false if the item is likely broken or unavailable in-game
+ */
+function isItemComplete(item) {
+  // Items without Variants - check Model and either GreyscaleTexture or Textures
+  if (!item.Variants) {
+    if (!item.Model) return false;
+    if (!item.GreyscaleTexture && (!item.Textures || Object.keys(item.Textures).length === 0)) {
+      return false;
+    }
+    return true;
+  }
+
+  // Items with Variants - check each variant has Model and texture
+  // Need at least one complete variant
+  const variants = Object.values(item.Variants);
+  if (variants.length === 0) return false;
+
+  for (const variant of variants) {
+    if (!variant.Model) continue;
+    if (variant.GreyscaleTexture || (variant.Textures && Object.keys(variant.Textures).length > 0)) {
+      return true; // At least one complete variant found
+    }
+  }
+  return false;
+}
+
+/**
+ * Get thumbnail path for an item
+ * Returns path that works with /asset/ route (tries Common/ prefix)
+ */
+function getItemThumbnail(item) {
+  let texturePath = null;
+
+  // Try greyscale texture first (most items have this)
+  if (item.GreyscaleTexture) {
+    texturePath = item.GreyscaleTexture;
+  }
+  // Try first texture from Textures object
+  else if (item.Textures && typeof item.Textures === 'object') {
+    const firstTexture = Object.values(item.Textures)[0];
+    if (firstTexture && firstTexture.Texture) {
+      texturePath = firstTexture.Texture;
+    }
+  }
+  // Try Variants (for capes etc)
+  else if (item.Variants) {
+    const firstVariant = Object.values(item.Variants)[0];
+    if (firstVariant) {
+      if (firstVariant.GreyscaleTexture) {
+        texturePath = firstVariant.GreyscaleTexture;
+      } else if (firstVariant.Textures) {
+        const firstTex = Object.values(firstVariant.Textures)[0];
+        if (firstTex && firstTex.Texture) {
+          texturePath = firstTex.Texture;
+        }
+      }
+    }
+  }
+
+  // Normalize path - ensure it starts with a known prefix
+  if (texturePath) {
+    // Paths in configs are relative to Common/ or Cosmetics/ inside Assets.zip
+    // The extractAsset function tries multiple prefixes, so we just return as-is
+    return texturePath;
+  }
+
+  return null;
+}
+
+/**
+ * Cosmetics list API endpoint - returns properly structured data for customizer
  */
 function handleCosmeticsList(req, res) {
   const configs = assets.loadCosmeticConfigs();
   const gradientSets = assets.loadGradientSets();
 
   if (!configs) {
-    sendJson(res, 200, { categories: {}, gradientSets: [] });
+    sendJson(res, 200, {});
     return;
   }
 
+  // Build global color hex map from all gradient sets
+  const colorHexMap = buildColorHexMap(gradientSets);
+
+  // Transform configs into customizer-friendly format
+  const result = {};
+
+  for (const [category, items] of Object.entries(configs)) {
+    const categoryItems = [];
+
+    for (const [itemId, item] of Object.entries(items)) {
+      // Filter out incomplete items that are missing required files
+      if (!isItemComplete(item)) {
+        continue;
+      }
+
+      const colors = getItemColors(item, gradientSets);
+      const thumbnail = getItemThumbnail(item);
+
+      // Check if item has variants (like capes with Neck_Piece/NoNeck)
+      let variants = null;
+      if (item.Variants) {
+        variants = Object.keys(item.Variants).map(variantId => ({
+          id: variantId,
+          name: item.Variants[variantId].NameKey || variantId
+        }));
+      }
+
+      categoryItems.push({
+        id: itemId,
+        name: item.Name || itemId,
+        thumbnail: thumbnail,
+        colors: colors,
+        gradientSet: item.GradientSet || null,
+        model: item.Model || null,
+        variants: variants
+      });
+    }
+
+    // Sort items alphabetically by ID for consistent ordering
+    categoryItems.sort((a, b) => a.id.localeCompare(b.id));
+
+    result[category] = categoryItems;
+  }
+
+  // Add special skinTone "category" from Skin gradient set
+  // SkinTone is not a standard cosmetic - it's bodyCharacteristic + skin color
+  const skinGradientSet = gradientSets ? gradientSets.find(g => g.Id === 'Skin') : null;
+  if (skinGradientSet && skinGradientSet.Gradients) {
+    // Skin tones are colors in the Skin gradient set (01, 02, 03, etc.)
+    const skinColors = Object.keys(skinGradientSet.Gradients).sort((a, b) => {
+      // Sort numerically for skin tones
+      const aNum = parseInt(a);
+      const bNum = parseInt(b);
+      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+      return a.localeCompare(b);
+    });
+
+    // Create a single "Default" skin item with all skin tone colors
+    result['skinTone'] = [{
+      id: 'Default',
+      name: 'Skin Tone',
+      thumbnail: null,
+      colors: skinColors,
+      gradientSet: 'Skin',
+      model: null
+    }];
+  }
+
+  // Also return gradient sets info and color map for the UI
   sendJson(res, 200, {
-    categories: configs,
-    gradientSets: gradientSets || []
+    items: result,
+    colorHexMap: colorHexMap,
+    gradientSets: (gradientSets || []).map(gs => ({
+      id: gs.Id,
+      colors: gs.Gradients ? Object.keys(gs.Gradients) : []
+    }))
   });
 }
 

@@ -438,37 +438,48 @@ class HytaleAvatarViewer {
   async _loadTexture(path) {
     if (this.textureCache.has(path)) return this.textureCache.get(path);
 
-    return new Promise((resolve) => {
-      const fullPath = path.startsWith('Common/') ? '/asset/' + path : '/asset/Common/' + path;
-      this.textureLoader.load(fullPath,
-        (texture) => {
-          texture.magFilter = THREE.NearestFilter;
-          texture.minFilter = THREE.NearestFilter;
-          texture.wrapS = THREE.ClampToEdgeWrapping;
-          texture.wrapT = THREE.ClampToEdgeWrapping;
-          texture.generateMipmaps = false;
-          this.textureCache.set(path, texture);
-          resolve(texture);
-        },
-        undefined,
-        () => {
-          const altPath = '/asset/' + path.replace('Common/', '');
-          this.textureLoader.load(altPath,
-            (texture) => {
-              texture.magFilter = THREE.NearestFilter;
-              texture.minFilter = THREE.NearestFilter;
-              texture.wrapS = THREE.ClampToEdgeWrapping;
-              texture.wrapT = THREE.ClampToEdgeWrapping;
-              texture.generateMipmaps = false;
-              this.textureCache.set(path, texture);
-              resolve(texture);
+    // Try multiple path variations to find the texture
+    const pathsToTry = [
+      path.startsWith('Common/') ? '/asset/' + path : '/asset/Common/' + path,
+      '/asset/' + path,
+      '/asset/' + path.replace('Common/', ''),
+      '/asset/Common/' + path.replace('Common/', '')
+    ];
+
+    // Remove duplicates
+    const uniquePaths = [...new Set(pathsToTry)];
+
+    console.log('[TEXTURE] Loading:', path, 'trying paths:', uniquePaths);
+
+    for (const tryPath of uniquePaths) {
+      try {
+        const texture = await new Promise((resolve, reject) => {
+          this.textureLoader.load(tryPath,
+            (tex) => {
+              console.log('[TEXTURE] Loaded successfully:', tryPath, 'size:', tex.image?.width, 'x', tex.image?.height);
+              tex.magFilter = THREE.NearestFilter;
+              tex.minFilter = THREE.NearestFilter;
+              tex.wrapS = THREE.ClampToEdgeWrapping;
+              tex.wrapT = THREE.ClampToEdgeWrapping;
+              tex.generateMipmaps = false;
+              resolve(tex);
             },
             undefined,
-            () => resolve(null)
+            (err) => {
+              console.log('[TEXTURE] Failed path:', tryPath);
+              reject(new Error('Failed to load'));
+            }
           );
-        }
-      );
-    });
+        });
+        this.textureCache.set(path, texture);
+        return texture;
+      } catch (e) {
+        // Try next path
+      }
+    }
+
+    console.warn('[TEXTURE] Failed to load:', path, 'tried:', uniquePaths);
+    return null;
   }
 
   _createCanvasTexture(canvas) {
@@ -689,8 +700,11 @@ class HytaleAvatarViewer {
         let texture = null;
         const isSkinPart = part.gradientSet === 'Skin' || ['face', 'ears', 'mouth'].includes(key);
 
+        console.log(`[COSMETIC] ${key}:`, { texture: part.texture, greyscaleTexture: part.greyscaleTexture, gradientTexture: part.gradientTexture });
+
         if (part.texture) {
           texture = await this._loadTexture(part.texture);
+          console.log(`[COSMETIC] ${key} loaded texture:`, texture ? 'SUCCESS' : 'FAILED');
         } else if (part.greyscaleTexture) {
           let gradientPath = part.gradientTexture;
           let baseCol = part.baseColor;
@@ -810,16 +824,33 @@ class HytaleAvatarViewer {
     group.name = nodeName + '_cosmetic';
 
     if (attachedToPlayerBone) {
+      // When a cosmetic node matches a player bone by name, it attaches directly
+      // to that bone. The node's position represents where the bone IS in the
+      // template (not an offset to apply), so we only apply the orientation.
+      // The position is ignored because the cosmetic should align with wherever
+      // the player's bone actually is, not where the template expected it.
       if (node.orientation) {
         group.quaternion.set(
-          node.orientation.x || 0,
-          node.orientation.y || 0,
-          node.orientation.z || 0,
-          node.orientation.w || 1
+          node.orientation.x ?? 0,
+          node.orientation.y ?? 0,
+          node.orientation.z ?? 0,
+          node.orientation.w ?? 1
         );
       }
     } else {
       this._applyTransform(group, node);
+    }
+
+    // Debug logging for cape nodes
+    if (partType === 'cape' && (nodeName === 'CapeArmor' || nodeName === 'Collar' || nodeName === 'Chest')) {
+      console.log(`[CAPE DEBUG] ${nodeName}: attached=${attachedToPlayerBone}, parent=${parent.name}`);
+      console.log(`  node.position: (${node.position?.x?.toFixed(2) || 0}, ${node.position?.y?.toFixed(2) || 0}, ${node.position?.z?.toFixed(2) || 0})`);
+      console.log(`  node.orientation: (${(node.orientation?.x ?? 0).toFixed(3)}, ${(node.orientation?.y ?? 0).toFixed(3)}, ${(node.orientation?.z ?? 0).toFixed(3)}, ${(node.orientation?.w ?? 1).toFixed(3)})`);
+      console.log(`  group.position: (${group.position.x.toFixed(3)}, ${group.position.y.toFixed(3)}, ${group.position.z.toFixed(3)})`);
+      console.log(`  group.quaternion: (${group.quaternion.x.toFixed(3)}, ${group.quaternion.y.toFixed(3)}, ${group.quaternion.z.toFixed(3)}, ${group.quaternion.w.toFixed(3)})`);
+      if (node.shape?.offset) {
+        console.log(`  shape.offset: (${node.shape.offset.x?.toFixed(2) || 0}, ${node.shape.offset.y?.toFixed(2) || 0}, ${node.shape.offset.z?.toFixed(2) || 0})`);
+      }
     }
 
     if (zOffset) {
@@ -873,10 +904,10 @@ class HytaleAvatarViewer {
   _applyTransform(group, node) {
     if (node.orientation) {
       group.quaternion.set(
-        node.orientation.x || 0,
-        node.orientation.y || 0,
-        node.orientation.z || 0,
-        node.orientation.w || 1
+        node.orientation.x ?? 0,
+        node.orientation.y ?? 0,
+        node.orientation.z ?? 0,
+        node.orientation.w ?? 1
       );
     }
 
@@ -939,6 +970,7 @@ class HytaleAvatarViewer {
           if (layout && layout.offset) {
             const angle = layout.angle || 0;
 
+            // Get face dimensions in pixels based on face orientation
             let uv_size = [0, 0];
             if (faceName === 'left' || faceName === 'right') {
               uv_size = [pixelD, pixelH];
@@ -955,9 +987,11 @@ class HytaleAvatarViewer {
 
             const uv_offset = [layout.offset.x, layout.offset.y];
 
+            // Calculate UV coordinates based on angle (matching Blockbench plugin logic)
             let result;
             switch (angle) {
               case 90:
+                // Swap size and mirror, flip mirror X
                 [uv_size[0], uv_size[1]] = [uv_size[1], uv_size[0]];
                 [uv_mirror[0], uv_mirror[1]] = [uv_mirror[1], uv_mirror[0]];
                 uv_mirror[0] *= -1;
@@ -969,6 +1003,7 @@ class HytaleAvatarViewer {
                 ];
                 break;
               case 180:
+                // Flip both mirrors
                 uv_mirror[0] *= -1;
                 uv_mirror[1] *= -1;
                 result = [
@@ -979,6 +1014,7 @@ class HytaleAvatarViewer {
                 ];
                 break;
               case 270:
+                // Swap size and mirror, flip mirror Y
                 [uv_size[0], uv_size[1]] = [uv_size[1], uv_size[0]];
                 [uv_mirror[0], uv_mirror[1]] = [uv_mirror[1], uv_mirror[0]];
                 uv_mirror[1] *= -1;
@@ -989,7 +1025,7 @@ class HytaleAvatarViewer {
                   uv_offset[1] + uv_size[1] * uv_mirror[1]
                 ];
                 break;
-              default:
+              default: // 0 degrees
                 result = [
                   uv_offset[0],
                   uv_offset[1],
@@ -999,23 +1035,53 @@ class HytaleAvatarViewer {
                 break;
             }
 
+            // Convert pixel coordinates to normalized UV (0-1) with Y flip for WebGL
             const u1 = result[0] / texW;
             const v1 = 1.0 - result[1] / texH;
             const u2 = result[2] / texW;
             const v2 = 1.0 - result[3] / texH;
 
+            // Apply UV rotation by mapping result to correct vertex positions
+            // Three.js BoxGeometry UV vertex order: bottom-left, bottom-right, top-left, top-right
             const baseIdx = faceIdx * 4 * 2;
-            uvArray[baseIdx + 0] = u1; uvArray[baseIdx + 1] = v1;
-            uvArray[baseIdx + 2] = u2; uvArray[baseIdx + 3] = v1;
-            uvArray[baseIdx + 4] = u1; uvArray[baseIdx + 5] = v2;
-            uvArray[baseIdx + 6] = u2; uvArray[baseIdx + 7] = v2;
+
+            // Apply the rotation to the UV assignment based on angle
+            if (angle === 90) {
+              // Rotate 90 CW: swap axes
+              uvArray[baseIdx + 0] = u1; uvArray[baseIdx + 1] = v2;
+              uvArray[baseIdx + 2] = u1; uvArray[baseIdx + 3] = v1;
+              uvArray[baseIdx + 4] = u2; uvArray[baseIdx + 5] = v2;
+              uvArray[baseIdx + 6] = u2; uvArray[baseIdx + 7] = v1;
+            } else if (angle === 180) {
+              // Rotate 180: flip both
+              uvArray[baseIdx + 0] = u2; uvArray[baseIdx + 1] = v2;
+              uvArray[baseIdx + 2] = u1; uvArray[baseIdx + 3] = v2;
+              uvArray[baseIdx + 4] = u2; uvArray[baseIdx + 5] = v1;
+              uvArray[baseIdx + 6] = u1; uvArray[baseIdx + 7] = v1;
+            } else if (angle === 270) {
+              // Rotate 270 CW (90 CCW): swap axes opposite
+              uvArray[baseIdx + 0] = u2; uvArray[baseIdx + 1] = v1;
+              uvArray[baseIdx + 2] = u2; uvArray[baseIdx + 3] = v2;
+              uvArray[baseIdx + 4] = u1; uvArray[baseIdx + 5] = v1;
+              uvArray[baseIdx + 6] = u1; uvArray[baseIdx + 7] = v2;
+            } else {
+              // No rotation
+              uvArray[baseIdx + 0] = u1; uvArray[baseIdx + 1] = v1;
+              uvArray[baseIdx + 2] = u2; uvArray[baseIdx + 3] = v1;
+              uvArray[baseIdx + 4] = u1; uvArray[baseIdx + 5] = v2;
+              uvArray[baseIdx + 6] = u2; uvArray[baseIdx + 7] = v2;
+            }
           }
         }
         uvAttr.needsUpdate = true;
       }
     }
 
-    const needsDoubleSide = flipX || flipY || flipZ;
+    // Determine if we need double-sided rendering:
+    // 1. Model explicitly requests it via doubleSided property
+    // 2. Negative stretch values flip the geometry, which inverts face winding
+    const modelDoubleSided = shape.doubleSided === true;
+    const needsDoubleSide = modelDoubleSided || flipX || flipY || flipZ;
 
     let material;
     if (texture) {
@@ -1105,40 +1171,97 @@ class HytaleAvatarViewer {
         const layout = shape.textureLayout.front;
         if (layout && layout.offset) {
           const angle = layout.angle || 0;
-          const mirrorX = layout.mirror?.x || false;
-          const mirrorY = layout.mirror?.y || false;
 
-          const x = layout.offset.x;
-          const x2 = layout.offset.x + (mirrorX ? -1 : 1) * pixelW;
-          const vTop = 1.0 - layout.offset.y / texH;
-          const vBottom = 1.0 - (layout.offset.y + (mirrorY ? -1 : 1) * pixelH) / texH;
-
-          let uvs = [
-            [x / texW, vTop],
-            [x2 / texW, vTop],
-            [x / texW, vBottom],
-            [x2 / texW, vBottom]
+          // Match Blockbench plugin UV calculation for quads
+          let uv_size = [pixelW, pixelH];
+          let uv_mirror = [
+            layout.mirror?.x ? -1 : 1,
+            layout.mirror?.y ? -1 : 1
           ];
+          const uv_offset = [layout.offset.x, layout.offset.y];
 
-          if (angle !== 0) {
-            const cx = (x + x2) / 2 / texW;
-            const cy = (vTop + vBottom) / 2;
-            const rad = -angle * Math.PI / 180;
-            const cos = Math.cos(rad);
-            const sin = Math.sin(rad);
-            uvs = uvs.map(function(uv) {
-              const du = uv[0] - cx;
-              const dv = uv[1] - cy;
-              return [cx + du * cos - dv * sin, cy + du * sin + dv * cos];
-            });
+          // Calculate UV result based on angle (same logic as boxes)
+          let result;
+          switch (angle) {
+            case 90:
+              [uv_size[0], uv_size[1]] = [uv_size[1], uv_size[0]];
+              [uv_mirror[0], uv_mirror[1]] = [uv_mirror[1], uv_mirror[0]];
+              uv_mirror[0] *= -1;
+              result = [
+                uv_offset[0],
+                uv_offset[1] + uv_size[1] * uv_mirror[1],
+                uv_offset[0] + uv_size[0] * uv_mirror[0],
+                uv_offset[1]
+              ];
+              break;
+            case 180:
+              uv_mirror[0] *= -1;
+              uv_mirror[1] *= -1;
+              result = [
+                uv_offset[0] + uv_size[0] * uv_mirror[0],
+                uv_offset[1] + uv_size[1] * uv_mirror[1],
+                uv_offset[0],
+                uv_offset[1]
+              ];
+              break;
+            case 270:
+              [uv_size[0], uv_size[1]] = [uv_size[1], uv_size[0]];
+              [uv_mirror[0], uv_mirror[1]] = [uv_mirror[1], uv_mirror[0]];
+              uv_mirror[1] *= -1;
+              result = [
+                uv_offset[0] + uv_size[0] * uv_mirror[0],
+                uv_offset[1],
+                uv_offset[0],
+                uv_offset[1] + uv_size[1] * uv_mirror[1]
+              ];
+              break;
+            default: // 0 degrees
+              result = [
+                uv_offset[0],
+                uv_offset[1],
+                uv_offset[0] + uv_size[0] * uv_mirror[0],
+                uv_offset[1] + uv_size[1] * uv_mirror[1]
+              ];
+              break;
           }
 
-          const newUVs = new Float32Array([
-            uvs[0][0], uvs[0][1],
-            uvs[1][0], uvs[1][1],
-            uvs[2][0], uvs[2][1],
-            uvs[3][0], uvs[3][1]
-          ]);
+          // Convert to normalized UV coordinates with Y flip for WebGL
+          const u1 = result[0] / texW;
+          const v1 = 1.0 - result[1] / texH;
+          const u2 = result[2] / texW;
+          const v2 = 1.0 - result[3] / texH;
+
+          // PlaneGeometry UV vertex order: bottom-left, bottom-right, top-left, top-right
+          let newUVs;
+          if (angle === 90) {
+            newUVs = new Float32Array([
+              u1, v2,
+              u1, v1,
+              u2, v2,
+              u2, v1
+            ]);
+          } else if (angle === 180) {
+            newUVs = new Float32Array([
+              u2, v2,
+              u1, v2,
+              u2, v1,
+              u1, v1
+            ]);
+          } else if (angle === 270) {
+            newUVs = new Float32Array([
+              u2, v1,
+              u2, v2,
+              u1, v1,
+              u1, v2
+            ]);
+          } else {
+            newUVs = new Float32Array([
+              u1, v1,
+              u2, v1,
+              u1, v2,
+              u2, v2
+            ]);
+          }
           geometry.setAttribute('uv', new THREE.BufferAttribute(newUVs, 2));
         }
       }

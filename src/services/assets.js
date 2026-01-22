@@ -241,11 +241,15 @@ function resolveSkinPart(category, partValue, configs, gradientSets) {
   // Parse "PartId.ColorId" or "PartId.ColorId.Variant" format
   const parts = partValue.split('.');
   const partId = parts[0];
-  const colorId = parts.length > 1 ? parts[1] : null;
-  const variantId = parts.length > 2 ? parts[2] : null;
+  // Handle empty color (e.g., "ItemId..VariantId") by treating empty string as null
+  const colorId = (parts.length > 1 && parts[1]) ? parts[1] : null;
+  const variantId = (parts.length > 2 && parts[2]) ? parts[2] : null;
+
+  console.log(`[resolveSkinPart] ${category}: partValue="${partValue}" -> partId="${partId}", colorId="${colorId}", variantId="${variantId}"`);
 
   const partConfig = configs[category][partId];
   if (!partConfig) {
+    console.log(`[resolveSkinPart] ${category}: partConfig not found for "${partId}"`);
     return null;
   }
 
@@ -257,7 +261,10 @@ function resolveSkinPart(category, partValue, configs, gradientSets) {
 
   // Handle items with Variants (like capes)
   if (partConfig.Variants) {
+    // Use specified variant, or default to Neck_Piece (with shoulder/collar pieces)
+    // User can select NoNeck variant to hide shoulder pieces
     const variant = variantId ? partConfig.Variants[variantId] : partConfig.Variants['Neck_Piece'] || Object.values(partConfig.Variants)[0];
+    console.log(`[resolveSkinPart] ${category}: variant found:`, variant ? 'yes' : 'no', 'has Textures:', !!variant?.Textures, 'has GreyscaleTexture:', !!variant?.GreyscaleTexture);
     if (variant) {
       result.model = variant.Model;
       result.greyscaleTexture = variant.GreyscaleTexture;
@@ -265,6 +272,7 @@ function resolveSkinPart(category, partValue, configs, gradientSets) {
       if (variant.Textures && colorId && variant.Textures[colorId]) {
         result.texture = variant.Textures[colorId].Texture;
         result.baseColor = variant.Textures[colorId].BaseColor;
+        console.log(`[resolveSkinPart] ${category}: using Textures[${colorId}] -> texture="${result.texture}"`);
       } else if (variant.GreyscaleTexture && partConfig.GradientSet) {
         result.gradientSet = partConfig.GradientSet;
         if (colorId && gradientSets) {
