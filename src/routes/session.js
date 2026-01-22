@@ -8,21 +8,28 @@ const { sendJson } = require('../utils/response');
  * Create new game session (used by official launcher and servers)
  */
 function handleGameSessionNew(req, res, body, uuid, name) {
-  console.log('game-session/new:', uuid, name);
+  console.log('game-session/new:', uuid, name, 'scopes:', body.scopes || body.scope);
 
   // Extract server audience from request
   const serverAudience = body.serverAudience || body.server_id || null;
 
-  const identityToken = auth.generateIdentityToken(uuid, name);
+  // Extract requested scopes (array or space-separated string)
+  const scopes = body.scopes || body.scope || null;
+
+  const identityToken = auth.generateIdentityToken(uuid, name, scopes);
   const sessionToken = auth.generateSessionToken(uuid);
 
   // Register the session
   storage.registerSession(sessionToken, uuid, name, serverAudience);
 
+  // Calculate expiresAt for Java client compatibility
+  const expiresAt = new Date(Date.now() + config.sessionTtl * 1000).toISOString();
+
   sendJson(res, 200, {
     identityToken: identityToken,
     sessionToken: sessionToken,
     expiresIn: config.sessionTtl,
+    expiresAt: expiresAt,
     tokenType: 'Bearer'
   });
 }
@@ -31,21 +38,28 @@ function handleGameSessionNew(req, res, body, uuid, name) {
  * Refresh game session
  */
 async function handleGameSessionRefresh(req, res, body, uuid, name, headers) {
-  console.log('game-session/refresh:', uuid, name);
+  console.log('game-session/refresh:', uuid, name, 'scopes:', body.scopes || body.scope);
 
   // Extract server audience from token if present
   const serverAudience = auth.extractServerAudienceFromHeaders(headers);
 
-  const identityToken = auth.generateIdentityToken(uuid, name);
+  // Extract requested scopes (array or space-separated string)
+  const scopes = body.scopes || body.scope || null;
+
+  const identityToken = auth.generateIdentityToken(uuid, name, scopes);
   const sessionToken = auth.generateSessionToken(uuid);
 
   // Update session
   storage.registerSession(sessionToken, uuid, name, serverAudience);
 
+  // Calculate expiresAt for Java client compatibility
+  const expiresAt = new Date(Date.now() + config.sessionTtl * 1000).toISOString();
+
   sendJson(res, 200, {
     identityToken: identityToken,
     sessionToken: sessionToken,
     expiresIn: config.sessionTtl,
+    expiresAt: expiresAt,
     tokenType: 'Bearer'
   });
 }
@@ -54,15 +68,22 @@ async function handleGameSessionRefresh(req, res, body, uuid, name, headers) {
  * Create child session
  */
 function handleGameSessionChild(req, res, body, uuid, name) {
-  console.log('game-session/child:', uuid, name);
+  console.log('game-session/child:', uuid, name, 'scopes:', body.scopes || body.scope);
 
-  const childToken = auth.generateIdentityToken(uuid, name);
+  // Extract requested scopes (array or space-separated string)
+  const scopes = body.scopes || body.scope || null;
+
+  const childToken = auth.generateIdentityToken(uuid, name, scopes);
   const sessionToken = auth.generateSessionToken(uuid);
+
+  // Calculate expiresAt for Java client compatibility
+  const expiresAt = new Date(Date.now() + config.sessionTtl * 1000).toISOString();
 
   sendJson(res, 200, {
     identityToken: childToken,
     sessionToken: sessionToken,
     expiresIn: config.sessionTtl,
+    expiresAt: expiresAt,
     tokenType: 'Bearer'
   });
 }
@@ -88,20 +109,25 @@ async function handleGameSessionDelete(req, res, headers) {
 function handleAuthorizationGrant(req, res, body, uuid, name, headers) {
   console.log('Authorization grant request:', uuid, name, 'body:', JSON.stringify(body));
 
+  // Extract scopes from request or identity token
+  let scopes = body.scopes || body.scope || null;
+
   // Extract user info from identity token if present in request
   if (body.identityToken) {
     const tokenData = auth.parseToken(body.identityToken);
     if (tokenData) {
       if (tokenData.uuid) uuid = tokenData.uuid;
       if (tokenData.name) name = tokenData.name;
-      console.log('Extracted from identity token - uuid:', uuid, 'name:', name);
+      // Preserve scopes from identity token if not explicitly specified in request
+      if (!scopes && tokenData.scope) scopes = tokenData.scope;
+      console.log('Extracted from identity token - uuid:', uuid, 'name:', name, 'scope:', tokenData.scope);
     }
   }
 
   // Extract audience from request (server's unique ID)
   const audience = body.aud || body.audience || body.server_id || crypto.randomUUID();
 
-  const authGrant = auth.generateAuthorizationGrant(uuid, name, audience);
+  const authGrant = auth.generateAuthorizationGrant(uuid, name, audience, scopes);
   const expiresAt = new Date(Date.now() + config.sessionTtl * 1000).toISOString();
 
   // Track this auth grant - player is joining this server
@@ -119,6 +145,9 @@ function handleAuthorizationGrant(req, res, body, uuid, name, headers) {
 function handleTokenExchange(req, res, body, uuid, name, headers) {
   console.log('Token exchange request:', uuid, name);
 
+  // Extract scopes from request or auth grant
+  let scopes = body.scopes || body.scope || null;
+
   // Extract audience from the authorization grant JWT
   let audience = null;
   if (body.authorizationGrant) {
@@ -127,7 +156,9 @@ function handleTokenExchange(req, res, body, uuid, name, headers) {
       audience = tokenData.aud;
       if (tokenData.uuid) uuid = tokenData.uuid;
       if (tokenData.name) name = tokenData.name;
-      console.log('Extracted from auth grant - aud:', audience, 'sub:', uuid, 'name:', name);
+      // Preserve scopes from auth grant if not explicitly specified in request
+      if (!scopes && tokenData.scope) scopes = tokenData.scope;
+      console.log('Extracted from auth grant - aud:', audience, 'sub:', uuid, 'name:', name, 'scope:', tokenData.scope);
     }
   }
 
@@ -135,9 +166,12 @@ function handleTokenExchange(req, res, body, uuid, name, headers) {
   const certFingerprint = body.x509Fingerprint || body.certFingerprint || body.fingerprint;
   console.log('Certificate fingerprint:', certFingerprint);
 
-  const accessToken = auth.generateAccessToken(uuid, name, audience, certFingerprint);
+  const accessToken = auth.generateAccessToken(uuid, name, audience, certFingerprint, scopes);
   const refreshToken = auth.generateSessionToken(uuid);
   const expiresAt = new Date(Date.now() + config.sessionTtl * 1000).toISOString();
+
+  // Normalize scopes for response
+  const responseScope = auth.normalizeScopes(scopes);
 
   // Register session with server audience so it persists across restarts
   storage.registerSession(accessToken, uuid, name, audience);
@@ -148,7 +182,7 @@ function handleTokenExchange(req, res, body, uuid, name, headers) {
     expiresIn: config.sessionTtl,
     refreshToken: refreshToken,
     expiresAt: expiresAt,
-    scope: 'hytale:server hytale:client'
+    scope: responseScope
   });
 }
 

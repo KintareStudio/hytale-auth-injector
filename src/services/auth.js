@@ -78,19 +78,39 @@ function generateToken(payload) {
   return `${signingInput}.${signature.toString('base64url')}`;
 }
 
+// Default scopes that cover all client types (game client + asset editor)
+const DEFAULT_SCOPES = 'hytale:server hytale:client hytale:editor';
+
+/**
+ * Normalize scopes to a space-separated string
+ * @param {string|string[]|null} scopes - Scopes as array or string
+ * @param {string} defaultScope - Default scope if none provided
+ * @returns {string} Space-separated scope string
+ */
+function normalizeScopes(scopes, defaultScope = DEFAULT_SCOPES) {
+  if (!scopes) return defaultScope;
+  if (Array.isArray(scopes)) return scopes.join(' ');
+  return scopes;
+}
+
 /**
  * Generate identity token for the game client/server
+ * @param {string} uuid - User UUID
+ * @param {string} name - Username
+ * @param {string[]|string} [scopes] - Requested scopes (defaults to 'hytale:server hytale:client')
+ * @param {string[]} [entitlements] - User entitlements
  */
-function generateIdentityToken(uuid, name, entitlements = ['game.base']) {
+function generateIdentityToken(uuid, name, scopes = null, entitlements = ['game.base']) {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + config.sessionTtl;
+  const scope = normalizeScopes(scopes);
 
   return generateToken({
     sub: uuid,
     name: name,
     username: name,
     entitlements: entitlements,
-    scope: 'hytale:server hytale:client',
+    scope: scope,
     iat: now,
     exp: exp,
     iss: `https://sessions.${config.domain}`,
@@ -117,17 +137,22 @@ function generateSessionToken(uuid) {
 
 /**
  * Generate authorization grant token for server connection
+ * @param {string} uuid - User UUID
+ * @param {string} name - Username
+ * @param {string} audience - Server audience
+ * @param {string[]|string} [scopes] - Requested scopes (defaults to 'hytale:server hytale:client')
  */
-function generateAuthorizationGrant(uuid, name, audience) {
+function generateAuthorizationGrant(uuid, name, audience, scopes = null) {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + config.sessionTtl;
+  const scope = normalizeScopes(scopes);
 
   return generateToken({
     sub: uuid,
     name: name,
     username: name,
     aud: audience,
-    scope: 'hytale:server hytale:client',
+    scope: scope,
     iat: now,
     exp: exp,
     iss: `https://sessions.${config.domain}`,
@@ -137,10 +162,16 @@ function generateAuthorizationGrant(uuid, name, audience) {
 
 /**
  * Generate access token with audience and optional certificate binding
+ * @param {string} uuid - User UUID
+ * @param {string} name - Username
+ * @param {string} audience - Server audience
+ * @param {string} [certFingerprint] - Certificate fingerprint for mTLS binding
+ * @param {string[]|string} [scopes] - Requested scopes (defaults to 'hytale:server hytale:client')
  */
-function generateAccessToken(uuid, name, audience, certFingerprint = null) {
+function generateAccessToken(uuid, name, audience, certFingerprint = null, scopes = null) {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + config.sessionTtl;
+  const scope = normalizeScopes(scopes);
 
   const tokenPayload = {
     sub: uuid,
@@ -148,7 +179,7 @@ function generateAccessToken(uuid, name, audience, certFingerprint = null) {
     username: name,
     aud: audience,
     entitlements: ['game.base'],
-    scope: 'hytale:server hytale:client',
+    scope: scope,
     iat: now,
     exp: exp,
     iss: `https://sessions.${config.domain}`,
@@ -222,4 +253,5 @@ module.exports = {
   generateAccessToken,
   parseToken,
   extractServerAudienceFromHeaders,
+  normalizeScopes,
 };

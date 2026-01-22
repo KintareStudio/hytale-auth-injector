@@ -51,18 +51,36 @@ describe('Auth Service', () => {
       expect(decoded.name).toBe(name);
       expect(decoded.username).toBe(name);
       expect(decoded.entitlements).toContain('game.base');
+      // Default scope includes all client types (game + editor)
       expect(decoded.scope).toContain('hytale:server');
       expect(decoded.scope).toContain('hytale:client');
+      expect(decoded.scope).toContain('hytale:editor');
       expect(decoded.iss).toContain('sessions.');
     });
 
     it('should include custom entitlements when provided', () => {
-      const token = auth.generateIdentityToken('uuid', 'name', ['game.base', 'game.premium']);
+      const token = auth.generateIdentityToken('uuid', 'name', null, ['game.base', 'game.premium']);
       const [, payload] = token.split('.');
       const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
 
       expect(decoded.entitlements).toContain('game.base');
       expect(decoded.entitlements).toContain('game.premium');
+    });
+
+    it('should include custom scopes when provided', () => {
+      const token = auth.generateIdentityToken('uuid', 'name', ['hytale:server', 'hytale:editor']);
+      const [, payload] = token.split('.');
+      const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+
+      expect(decoded.scope).toBe('hytale:server hytale:editor');
+    });
+
+    it('should accept scopes as space-separated string', () => {
+      const token = auth.generateIdentityToken('uuid', 'name', 'hytale:server hytale:editor');
+      const [, payload] = token.split('.');
+      const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+
+      expect(decoded.scope).toBe('hytale:server hytale:editor');
     });
   });
 
@@ -120,6 +138,38 @@ describe('Auth Service', () => {
     });
   });
 
+  describe('normalizeScopes', () => {
+    it('should return default scope when scopes is null', () => {
+      const result = auth.normalizeScopes(null);
+      // Default includes all client types
+      expect(result).toContain('hytale:server');
+      expect(result).toContain('hytale:client');
+      expect(result).toContain('hytale:editor');
+    });
+
+    it('should return default scope when scopes is undefined', () => {
+      const result = auth.normalizeScopes(undefined);
+      expect(result).toContain('hytale:server');
+      expect(result).toContain('hytale:client');
+      expect(result).toContain('hytale:editor');
+    });
+
+    it('should use custom default when provided', () => {
+      const result = auth.normalizeScopes(null, 'custom:scope');
+      expect(result).toBe('custom:scope');
+    });
+
+    it('should join array scopes with spaces', () => {
+      const result = auth.normalizeScopes(['hytale:server', 'hytale:editor']);
+      expect(result).toBe('hytale:server hytale:editor');
+    });
+
+    it('should return string scopes as-is', () => {
+      const result = auth.normalizeScopes('hytale:server hytale:client');
+      expect(result).toBe('hytale:server hytale:client');
+    });
+  });
+
   describe('parseToken', () => {
     it('should parse valid JWT token', () => {
       const token = auth.generateIdentityToken('test-uuid', 'TestName');
@@ -138,6 +188,13 @@ describe('Auth Service', () => {
     it('should return null for malformed JWT', () => {
       const result = auth.parseToken('a.b.c');
       expect(result).toBeNull();
+    });
+
+    it('should include scope in parsed token', () => {
+      const token = auth.generateIdentityToken('test-uuid', 'TestName', 'hytale:editor');
+      const parsed = auth.parseToken(token);
+
+      expect(parsed.scope).toBe('hytale:editor');
     });
   });
 

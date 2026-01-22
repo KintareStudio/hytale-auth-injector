@@ -36,7 +36,7 @@ describe('Session Routes', () => {
 
       sessionRoutes.handleGameSessionNew(req, mockRes, body, body.uuid, body.name);
 
-      expect(auth.generateIdentityToken).toHaveBeenCalledWith('test-uuid', 'TestPlayer');
+      expect(auth.generateIdentityToken).toHaveBeenCalledWith('test-uuid', 'TestPlayer', null);
       expect(auth.generateSessionToken).toHaveBeenCalledWith('test-uuid');
       expect(mockRes.writeHead).toHaveBeenCalledWith(200, expect.any(Object));
     });
@@ -86,7 +86,7 @@ describe('Session Routes', () => {
 
       sessionRoutes.handleGameSessionChild(req, mockRes, body, 'uuid', 'name');
 
-      expect(auth.generateIdentityToken).toHaveBeenCalled();
+      expect(auth.generateIdentityToken).toHaveBeenCalledWith('uuid', 'name', ['hytale:server', 'hytale:editor']);
       expect(auth.generateSessionToken).toHaveBeenCalled();
       expect(mockRes.writeHead).toHaveBeenCalledWith(200, expect.any(Object));
     });
@@ -100,6 +100,24 @@ describe('Session Routes', () => {
       const response = JSON.parse(mockRes.end.mock.calls[0][0]);
       expect(response.identityToken).toBeDefined();
       expect(response.sessionToken).toBeDefined();
+    });
+
+    it('should pass scopes as array to generateIdentityToken', () => {
+      const req = {};
+      const body = { scopes: ['hytale:server', 'hytale:editor'] };
+
+      sessionRoutes.handleGameSessionChild(req, mockRes, body, 'uuid', 'name');
+
+      expect(auth.generateIdentityToken).toHaveBeenCalledWith('uuid', 'name', ['hytale:server', 'hytale:editor']);
+    });
+
+    it('should pass scopes as string to generateIdentityToken', () => {
+      const req = {};
+      const body = { scope: 'hytale:server hytale:editor' };
+
+      sessionRoutes.handleGameSessionChild(req, mockRes, body, 'uuid', 'name');
+
+      expect(auth.generateIdentityToken).toHaveBeenCalledWith('uuid', 'name', 'hytale:server hytale:editor');
     });
   });
 
@@ -186,7 +204,8 @@ describe('Session Routes', () => {
         expect.any(String),
         expect.any(String),
         expect.any(String),
-        'fingerprint123'
+        'fingerprint123',
+        null
       );
     });
   });
