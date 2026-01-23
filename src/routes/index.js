@@ -5,4 +5,5 @@ module.exports = {
   admin: require('./admin'),
   assets: require('./assets'),
   avatar: require('./avatar'),
+  server: require('./server'),
 };

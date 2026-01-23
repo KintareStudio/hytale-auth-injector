@@ -713,6 +713,84 @@ async function searchPlayers(query, limit = 50) {
   }
 }
 
+// ============================================================================
+// DEVICE CODE MANAGEMENT (OAuth Device Flow)
+// ============================================================================
+
+// In-memory store for device codes (short-lived, no need for Redis)
+const deviceCodes = new Map();
+
+/**
+ * Register a device code for OAuth device flow
+ */
+function registerDeviceCode(deviceCode, userCode, clientId, scope) {
+  const data = {
+    deviceCode,
+    userCode,
+    clientId,
+    scope,
+    approved: false,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 600000  // 10 minutes
+  };
+
+  deviceCodes.set(deviceCode, data);
+  deviceCodes.set(userCode, data);  // Also index by user code
+
+  // Auto-cleanup expired codes
+  setTimeout(() => {
+    deviceCodes.delete(deviceCode);
+    deviceCodes.delete(userCode);
+  }, 600000);
+
+  console.log(`Device code registered: ${userCode} (expires in 10 min)`);
+  return data;
+}
+
+/**
+ * Get device code data
+ */
+function getDeviceCode(deviceCode) {
+  const data = deviceCodes.get(deviceCode);
+  if (!data) return null;
+
+  // Check expiry
+  if (Date.now() > data.expiresAt) {
+    deviceCodes.delete(deviceCode);
+    deviceCodes.delete(data.userCode);
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * Approve a device code by user code
+ */
+function approveDeviceCode(userCode) {
+  const data = deviceCodes.get(userCode);
+  if (data) {
+    data.approved = true;
+    console.log(`Device code approved: ${userCode}`);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Consume (delete) a device code after token exchange
+ */
+function consumeDeviceCode(deviceCode) {
+  const data = deviceCodes.get(deviceCode);
+  if (data) {
+    deviceCodes.delete(deviceCode);
+    deviceCodes.delete(data.userCode);
+    console.log(`Device code consumed: ${data.userCode}`);
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
   // Sessions
   registerSession,
@@ -748,4 +826,10 @@ module.exports = {
   // Admin tokens
   createAdminToken,
   verifyAdminToken,
+
+  // Device codes (OAuth device flow)
+  registerDeviceCode,
+  getDeviceCode,
+  approveDeviceCode,
+  consumeDeviceCode,
 };

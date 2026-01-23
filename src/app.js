@@ -115,6 +115,41 @@ async function routeRequest(req, res, url, urlPath, body, uuid, name, tokenScope
     return;
   }
 
+  // ====== Server Auto-Auth and OAuth endpoints (for F2P game servers) ======
+
+  // Server auto-auth (instant token for F2P servers)
+  if (urlPath === '/server/auto-auth') {
+    routes.server.handleServerAutoAuth(req, res, body);
+    return;
+  }
+
+  // Server game profiles (after OAuth)
+  if (urlPath === '/server/game-profiles' || urlPath === '/game-profiles') {
+    routes.server.handleServerGameProfiles(req, res, headers);
+    return;
+  }
+
+  // OAuth device authorization endpoint
+  if (urlPath === '/oauth2/device/auth') {
+    routes.server.handleOAuthDeviceAuth(req, res, body);
+    return;
+  }
+
+  // OAuth device verification page (user visits this)
+  if (urlPath === '/oauth2/device/verify') {
+    const query = Object.fromEntries(url.searchParams);
+    routes.server.handleOAuthDeviceVerify(req, res, query);
+    return;
+  }
+
+  // OAuth token endpoint (device code exchange, refresh)
+  if (urlPath === '/oauth2/token') {
+    routes.server.handleOAuthToken(req, res, body);
+    return;
+  }
+
+  // ====== Game session endpoints ======
+
   // Game session endpoints
   if (urlPath === '/game-session/new') {
     routes.session.handleGameSessionNew(req, res, body, uuid, name);
@@ -360,6 +395,8 @@ async function startServer() {
       console.log(`  - Asset extraction: /asset/{path}`);
       console.log(`  - Admin dashboard: /admin`);
       console.log(`  - Admin API: /admin/sessions, /admin/stats`);
+      console.log(`  - Server auto-auth: /server/auto-auth`);
+      console.log(`  - OAuth device flow: /oauth2/device/auth, /oauth2/token`);
     }
   });
 }
