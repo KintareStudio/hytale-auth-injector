@@ -1,4 +1,5 @@
 const assets = require('../services/assets');
+const config = require('../config');
 const { sendJson, sendBinary } = require('../utils/response');
 
 /**
@@ -203,7 +204,7 @@ function handleCosmeticsList(req, res) {
         }));
       }
 
-      categoryItems.push({
+      const itemData = {
         id: itemId,
         name: item.Name || itemId,
         thumbnail: thumbnail,
@@ -211,7 +212,44 @@ function handleCosmeticsList(req, res) {
         gradientSet: item.GradientSet || null,
         model: item.Model || null,
         variants: variants
-      });
+      };
+
+      // Add HeadAccessory-specific fields (for haircut interaction logic)
+      if (category === 'headAccessory' && item.HeadAccessoryType) {
+        itemData.headAccessoryType = item.HeadAccessoryType; // Simple, HalfCovering, FullyCovering
+      }
+
+      // Add Haircut-specific fields (for fallback logic)
+      if (category === 'haircut') {
+        if (item.HairType) {
+          itemData.hairType = item.HairType; // Short, Medium, Long
+        }
+        if (item.RequiresGenericHaircut !== undefined) {
+          itemData.requiresGenericHaircut = item.RequiresGenericHaircut;
+        }
+      }
+
+      // Add Entitlements (for filtering available items)
+      if (item.Entitlements && item.Entitlements.length > 0) {
+        itemData.entitlements = item.Entitlements;
+      }
+
+      // Add IsDefaultAsset (for preselection in customizer)
+      if (item.IsDefaultAsset) {
+        itemData.isDefault = true;
+      }
+
+      // Add DisableCharacterPartCategory (for item interaction logic)
+      if (item.DisableCharacterPartCategory) {
+        itemData.disablesCategory = item.DisableCharacterPartCategory.toLowerCase();
+      }
+
+      // Add VariantLocalizationKey (for variant label lookup)
+      if (item.VariantLocalizationKey) {
+        itemData.variantLocalizationKey = item.VariantLocalizationKey;
+      }
+
+      categoryItems.push(itemData);
     }
 
     // Sort items alphabetically by ID for consistent ordering
@@ -220,29 +258,9 @@ function handleCosmeticsList(req, res) {
     result[category] = categoryItems;
   }
 
-  // Add special skinTone "category" from Skin gradient set
-  // SkinTone is not a standard cosmetic - it's bodyCharacteristic + skin color
-  const skinGradientSet = gradientSets ? gradientSets.find(g => g.Id === 'Skin') : null;
-  if (skinGradientSet && skinGradientSet.Gradients) {
-    // Skin tones are colors in the Skin gradient set (01, 02, 03, etc.)
-    const skinColors = Object.keys(skinGradientSet.Gradients).sort((a, b) => {
-      // Sort numerically for skin tones
-      const aNum = parseInt(a);
-      const bNum = parseInt(b);
-      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-      return a.localeCompare(b);
-    });
-
-    // Create a single "Default" skin item with all skin tone colors
-    result['skinTone'] = [{
-      id: 'Default',
-      name: 'Skin Tone',
-      thumbnail: null,
-      colors: skinColors,
-      gradientSet: 'Skin',
-      model: null
-    }];
-  }
+  // NOTE: skinTone is NOT a separate category - it's the COLOR of bodyCharacteristic
+  // bodyCharacteristic items (Default, Muscular) use GradientSet: "Skin" which provides
+  // all 47 skin tone colors. Users select body type, then pick skin color.
 
   // Also return gradient sets info and color map for the UI
   sendJson(res, 200, {
@@ -355,9 +373,59 @@ function handleAssetRoute(req, res, urlPath) {
   });
 }
 
+/**
+ * Download route - serve files from downloads directory
+ * Used for HytaleServer.jar and other downloadable files
+ */
+function handleDownload(req, res, urlPath) {
+  const fs = require('fs');
+  const path = require('path');
+
+  // Extract filename from path (e.g., /download/HytaleServer.jar -> HytaleServer.jar)
+  const filename = urlPath.replace('/download/', '');
+
+  // Security: prevent path traversal
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    sendJson(res, 400, { error: 'Invalid filename' });
+    return;
+  }
+
+  const filePath = path.join(config.downloadsDir, filename);
+
+  if (!fs.existsSync(filePath)) {
+    sendJson(res, 404, { error: 'File not found' });
+    return;
+  }
+
+  try {
+    const stat = fs.statSync(filePath);
+    const content = fs.readFileSync(filePath);
+
+    // Determine content type
+    let contentType = 'application/octet-stream';
+    if (filename.endsWith('.jar')) {
+      contentType = 'application/java-archive';
+    } else if (filename.endsWith('.zip')) {
+      contentType = 'application/zip';
+    }
+
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Content-Length': stat.size,
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    res.end(content);
+  } catch (e) {
+    console.error('Download error:', e.message);
+    sendJson(res, 500, { error: 'Failed to serve file' });
+  }
+}
+
 module.exports = {
   handleCosmeticsList,
   handleCosmeticItem,
   handleStaticAssets,
   handleAssetRoute,
+  handleDownload,
 };

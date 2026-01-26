@@ -770,8 +770,8 @@
         icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>`,
         subcategories: {
           underwear: { name: 'Underwear', key: 'underwear', icon: `<svg viewBox="0 0 24 24"><path d="M6 6h12v4H6z" opacity="0.3"/><path d="M6 10h5v6l-3 4H6v-10zm7 0h5v10h-2l-3-4v-6z"/></svg>` },
-          skinTone: { name: 'Skin Tone', key: 'skinTone', icon: `<svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3" fill="#f4c39a"/><circle cx="12" cy="6" r="3" fill="#ba7f5b"/><circle cx="18" cy="6" r="3" fill="#6f3b2c"/><circle cx="6" cy="12" r="3" fill="#e0ae72"/><circle cx="12" cy="12" r="3" fill="#945d44"/><circle cx="18" cy="12" r="3" fill="#4f2a24"/></svg>` },
-          bodyCharacteristic: { name: 'Body Type', key: 'bodyCharacteristic', icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><path d="M8 10h8v3H8z"/><path d="M9 13h2v9H9zm4 0h2v9h-2z"/></svg>` }
+          bodyCharacteristic: { name: 'Body & Skin', key: 'bodyCharacteristic', icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><path d="M8 10h8v3H8z"/><path d="M9 13h2v9H9zm4 0h2v9h-2z"/><circle cx="6" cy="18" r="2" fill="#ba7f5b"/><circle cx="18" cy="18" r="2" fill="#6f3b2c"/></svg>` },
+          skinFeature: { name: 'Skin Features', key: 'skinFeature', icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="10" r="1"/><circle cx="16" cy="10" r="1"/><circle cx="10" cy="14" r="1"/><circle cx="14" cy="16" r="1"/></svg>` }
         }
       },
       capes: {
@@ -1161,12 +1161,18 @@
         'Blue': '#2164a8', 'BlueLight': '#aed3e2', 'Turquoise': '#258c95',
         'Green': '#279a67', 'White': '#e4e4e9', 'GreyAsh': '#ada192',
         'Grey': '#838393', 'GreyPurple': '#42485b', 'Blue_Anthracite': '#333146',
-        // Skin tones
+        // Skin tones (realistic 01-18, fantasy 19+)
         '01': '#f4c39a', '02': '#f5c490', '03': '#e0ae72', '04': '#ba7f5b', '05': '#945d44',
         '06': '#6f3b2c', '07': '#4f2a24', '08': '#dcc7a8', '09': '#f5bc83', '10': '#d98c5b',
         '11': '#ab7a4c', '12': '#7d432b', '13': '#513425', '14': '#31221f', '15': '#d5a082',
-        '16': '#63492f', '17': '#5e3a2f', '18': '#4d272b', '19': '#8aacfb', '20': '#a78af1',
-        '21': '#fc8572', '22': '#9bc55d',
+        '16': '#63492f', '17': '#5e3a2f', '18': '#4d272b',
+        // Fantasy skin tones
+        '19': '#8aacfb', '20': '#a78af1', '21': '#fc8572', '22': '#9bc55d',
+        '25': '#4354e6', '26': '#6c2abd', '27': '#765e48', '28': '#f3f3f3', '29': '#998d71',
+        '30': '#50843a', '31': '#b22a2a', '32': '#3276c3', '33': '#092029', '35': '#5eae37',
+        '36': '#ff72c2', '37': '#f4c944', '38': '#6c3f40', '39': '#ff9c5b', '41': '#ff95cd',
+        '42': '#a0dfff', '45': '#d5f0a0', '46': '#ddbfe8', '47': '#f0b9f2', '48': '#dcc5b0',
+        '49': '#ec6ff7', '50': '#2b2b2f', '51': '#f06f47', '52': '#131111',
         // Eye colors
         'Blue_Eye': '#5391c1', 'Turquoise_Eye': '#31a1af', 'Black_Eye': '#191111',
         'Grey_Eye': '#8a9295', 'Hazelnut': '#7d4e33', 'Honey': '#a97f37',
@@ -1227,6 +1233,31 @@
         } else {
           // No variants available - clear variant selection
           delete currentVariants[categoryKey];
+        }
+
+        // HeadAccessory/Haircut interaction warning
+        if (categoryKey === 'headAccessory' && itemId) {
+          // Check if this head accessory has a covering type that affects haircut
+          const headAccessoryType = selectedItem?.headAccessoryType;
+          if (headAccessoryType === 'HalfCovering') {
+            console.log('HeadAccessory with HalfCovering selected - haircut may use fallback');
+            // Could show a toast/warning here if desired
+          } else if (headAccessoryType === 'FullyCovering') {
+            console.log('HeadAccessory with FullyCovering selected - haircut may be hidden');
+            // Could show a toast/warning here if desired
+          }
+        }
+
+        // Handle DisableCharacterPartCategory - if item disables another category, clear it
+        if (selectedItem?.disablesCategory) {
+          const disabledCategory = selectedItem.disablesCategory;
+          console.log(`Item ${itemId} disables category: ${disabledCategory}`);
+          if (currentSkin[disabledCategory]) {
+            console.log(`Clearing disabled category: ${disabledCategory}`);
+            delete currentSkin[disabledCategory];
+            delete currentColors[disabledCategory];
+            delete currentVariants[disabledCategory];
+          }
         }
       }
 
@@ -1441,16 +1472,30 @@
       });
     }
 
+    // Required fields that must always have a value (from CosmeticsModule.java)
+    const REQUIRED_SKIN_FIELDS = ['face', 'ears', 'mouth', 'bodyCharacteristic', 'underwear', 'eyes'];
+
     function randomizeSkin() {
       for (const [catKey, category] of Object.entries(CATEGORIES)) {
         for (const [subKey, sub] of Object.entries(category.subcategories)) {
           const items = cosmeticItems[sub.key] || [];
-          if (items.length > 0 && Math.random() > 0.3) {
+          const isRequired = REQUIRED_SKIN_FIELDS.includes(sub.key);
+
+          // Only proceed if items are actually loaded for this category
+          if (items.length === 0) {
+            // Items not loaded - do NOT delete existing value
+            continue;
+          }
+
+          if (Math.random() > 0.3) {
+            // 70% chance to set a random item
             const randomItem = items[Math.floor(Math.random() * items.length)];
             currentSkin[sub.key] = randomItem.id;
             // Pick random color if available
             if (randomItem.colors && randomItem.colors.length > 0) {
               currentColors[sub.key] = randomItem.colors[Math.floor(Math.random() * randomItem.colors.length)];
+            } else {
+              delete currentColors[sub.key];
             }
             // Pick random variant if available
             if (randomItem.variants && randomItem.variants.length > 0) {
@@ -1458,7 +1503,8 @@
             } else {
               delete currentVariants[sub.key];
             }
-          } else if (Math.random() > 0.7) {
+          } else if (!isRequired && Math.random() > 0.7) {
+            // 30% chance to clear (but only for non-required fields)
             delete currentSkin[sub.key];
             delete currentColors[sub.key];
             delete currentVariants[sub.key];
@@ -1475,20 +1521,27 @@
     }
 
     async function saveSkin() {
+      // Validate required fields before saving
+      const missingFields = REQUIRED_SKIN_FIELDS.filter(field => !currentSkin[field]);
+      if (missingFields.length > 0) {
+        alert(`Cannot save: Missing required fields: ${missingFields.join(', ')}\n\nPlease select items for these categories before saving.`);
+        return;
+      }
+
       // Build final skin data with colors and variants
-      const saveSkin = {};
+      const saveSkinData = {};
       for (const [key, itemId] of Object.entries(currentSkin)) {
         const colorId = currentColors[key];
         const variantId = currentVariants[key];
 
         if (colorId && variantId) {
-          saveSkin[key] = `${itemId}.${colorId}.${variantId}`;
+          saveSkinData[key] = `${itemId}.${colorId}.${variantId}`;
         } else if (colorId) {
-          saveSkin[key] = `${itemId}.${colorId}`;
+          saveSkinData[key] = `${itemId}.${colorId}`;
         } else if (variantId) {
-          saveSkin[key] = `${itemId}..${variantId}`;
+          saveSkinData[key] = `${itemId}..${variantId}`;
         } else {
-          saveSkin[key] = itemId;
+          saveSkinData[key] = itemId;
         }
       }
 
@@ -1496,7 +1549,7 @@
         const response = await fetch(`/account-data/skin/${UUID}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(saveSkin)
+          body: JSON.stringify(saveSkinData)
         });
 
         if (response.ok) {

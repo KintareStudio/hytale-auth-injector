@@ -156,13 +156,27 @@ async function handleGameProfile(req, res, body, uuid, name) {
 
 /**
  * Skin update endpoint
+ *
+ * IMPORTANT: This merges new skin data with existing data to prevent
+ * accidental overwrites when partial updates are sent.
+ * Required fields: face, ears, mouth, bodyCharacteristic, underwear, eyes
  */
 async function handleSkin(req, res, body, uuid, name, invalidateHeadCache) {
-  console.log('skin update:', uuid);
+  console.log('skin update:', uuid, 'fields:', Object.keys(body).join(', '));
 
   const existingData = await storage.getUserData(uuid);
-  existingData.skin = body;
+
+  // Merge instead of overwrite to preserve existing values
+  // This prevents data loss when partial updates are sent
+  existingData.skin = {
+    ...existingData.skin,  // Keep existing skin data
+    ...body                // Overlay new values
+  };
   existingData.lastUpdated = new Date().toISOString();
+
+  // Log the merge result for debugging
+  console.log('skin merge result:', uuid, 'total fields:', Object.keys(existingData.skin).length);
+
   await storage.saveUserData(uuid, existingData);
 
   // Invalidate head image cache since skin changed

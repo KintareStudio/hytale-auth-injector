@@ -44,5 +44,6 @@ const config = {
 // Derived paths
 config.keyFile = path.join(config.dataDir, 'jwt_keys.json');
 config.headCacheDir = path.join(config.dataDir, 'head-cache');
+config.downloadsDir = process.env.DOWNLOADS_DIR || path.join(config.dataDir, 'downloads');
 
 module.exports = config;

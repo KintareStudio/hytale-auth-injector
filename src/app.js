@@ -96,6 +96,12 @@ async function routeRequest(req, res, url, urlPath, body, uuid, name, tokenScope
     return;
   }
 
+  // Download route (for HytaleServer.jar, etc.)
+  if (urlPath.startsWith('/download/')) {
+    routes.assets.handleDownload(req, res, urlPath);
+    return;
+  }
+
   // Health check
   if (urlPath === '/health' || urlPath === '/') {
     routes.health.handleHealth(req, res);

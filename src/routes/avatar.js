@@ -169,19 +169,27 @@ async function handleAvatarModel(req, res, uuid) {
   // Format: "BodyType.SkinToneId" e.g., "Muscular.22"
   let bodyType = 'Regular';
   let skinTone = '01'; // Default to light peach
+  let skinToneFromBody = false;
 
   if (userSkin.bodyCharacteristic) {
     const bodyParts = userSkin.bodyCharacteristic.split('.');
     bodyType = bodyParts[0] || 'Regular';
-    if (bodyParts.length > 1) {
+    if (bodyParts.length > 1 && bodyParts[1]) {
       // Pad single digit to two digits (e.g., "22" stays "22", "5" becomes "05")
       skinTone = bodyParts[1].padStart(2, '0');
+      skinToneFromBody = true;
     }
   }
 
-  // Allow explicit skinTone override
-  if (userSkin.skinTone) {
-    skinTone = userSkin.skinTone;
+  // Use explicit skinTone only if bodyCharacteristic didn't have one
+  // Format can be "XX" or "Default.XX" - extract the tone number
+  if (!skinToneFromBody && userSkin.skinTone) {
+    const toneParts = userSkin.skinTone.split('.');
+    // If format is "Default.XX", take the second part; otherwise use as-is
+    const toneValue = toneParts.length > 1 ? toneParts[1] : toneParts[0];
+    if (toneValue && toneValue !== 'Default') {
+      skinTone = toneValue.padStart(2, '0');
+    }
   }
 
   // Set no-cache headers to prevent browser caching of user skin data
@@ -252,17 +260,25 @@ async function handleAvatarPreview(req, res, uuid, customSkin = {}) {
   // Parse bodyCharacteristic for body type and skin tone
   let bodyType = 'Regular';
   let skinTone = '01';
+  let skinToneFromBody = false;
 
   if (customSkin.bodyCharacteristic) {
     const bodyParts = customSkin.bodyCharacteristic.split('.');
     bodyType = bodyParts[0] || 'Regular';
-    if (bodyParts.length > 1) {
+    if (bodyParts.length > 1 && bodyParts[1]) {
       skinTone = bodyParts[1].padStart(2, '0');
+      skinToneFromBody = true;
     }
   }
 
-  if (customSkin.skinTone) {
-    skinTone = customSkin.skinTone;
+  // Use explicit skinTone only if bodyCharacteristic didn't have one
+  // Format can be "XX" or "Default.XX" - extract the tone number
+  if (!skinToneFromBody && customSkin.skinTone) {
+    const toneParts = customSkin.skinTone.split('.');
+    const toneValue = toneParts.length > 1 ? toneParts[1] : toneParts[0];
+    if (toneValue && toneValue !== 'Default') {
+      skinTone = toneValue.padStart(2, '0');
+    }
   }
 
   sendJson(res, 200, {
