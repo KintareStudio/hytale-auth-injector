@@ -4504,13 +4504,13 @@ public class DualAuthPatcher {
                 mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
                 mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
                 mv.visitInsn(Opcodes.DUP);
-                mv.visitLdcInsn("[DualAuth] Unknown issuer '");
+                mv.visitLdcInsn("[DualAuth] Unknown issuer for Identity '");
                 mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(Ljava/lang/String;)V",
                                 false);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
                                 "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-                mv.visitLdcInsn("', generating dynamic token with original issuer");
+                mv.visitLdcInsn("', generating dynamic IDENTITY token (V2)");
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
                                 "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;",
