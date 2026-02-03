@@ -958,7 +958,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ICONST_1);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitLabel(notNull);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_DOMAIN", "Ljava/lang/String;");
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains",
@@ -980,7 +979,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ICONST_0);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitLabel(checkNotNull);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // Normalize: if (issuer.endsWith("/")) issuer = issuer.substring(0, len-1)
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -997,7 +995,6 @@ public class DualAuthPatcher {
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "substring", "(II)Ljava/lang/String;", false);
                 mv.visitVarInsn(Opcodes.ASTORE, 0);
                 mv.visitLabel(skipNormalize);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 1. Check HYTALE_TRUST_ALL_ISSUERS (Truly Agnostic Path)
                 mv.visitLdcInsn("HYTALE_TRUST_ALL_ISSUERS");
@@ -1012,7 +1009,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.IRETURN);
 
                 mv.visitLabel(checkTrustValue);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 mv.visitVarInsn(Opcodes.ALOAD, 1);
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "parseBoolean", "(Ljava/lang/String;)Z", false);
                 Label trustAllFalse = new Label();
@@ -1021,7 +1017,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.IRETURN);
 
                 mv.visitLabel(trustAllFalse);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 2. Fallback to Official
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -1031,7 +1026,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ICONST_1);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitLabel(notOfficialLocal);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 3. Fallback to Primary F2P (via F2P_BASE_DOMAIN)
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -1042,7 +1036,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ICONST_1);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitLabel(notF2PLocal);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 4. Fallback to Allowlist (TRUSTED_ISSUERS for Omni-Auth)
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -1072,7 +1065,6 @@ public class DualAuthPatcher {
                 mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_URL", "Ljava/lang/String;");
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(getSessionUrlNotNull);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { "java/lang/String" }, 0, null);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, HELPER_CLASS, "isOfficialIssuer",
                                 "(Ljava/lang/String;)Z", false);
@@ -1081,7 +1073,6 @@ public class DualAuthPatcher {
                 mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_URL", "Ljava/lang/String;");
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(getSessionUrlF2p);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 // For F2P: return the issuer itself (it's the session URL)
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitInsn(Opcodes.ARETURN);
@@ -1102,7 +1093,6 @@ public class DualAuthPatcher {
                 mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_URL", "Ljava/lang/String;");
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(issuerNotNull);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 // if (isOfficialIssuer(issuer)) return OFFICIAL_SESSION_URL
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, HELPER_CLASS, "isOfficialIssuer",
@@ -1112,7 +1102,6 @@ public class DualAuthPatcher {
                 mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_URL", "Ljava/lang/String;");
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(returnIssuer);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 // For F2P: return the issuer itself (it's the session URL)
                 // This preserves backward compatibility: sessions.sanasol.ws ->
                 // sessions.sanasol.ws
@@ -1137,7 +1126,6 @@ public class DualAuthPatcher {
                                 "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;", false);
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(keepOriginal);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitMaxs(3, 1);
@@ -1181,7 +1169,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(hasDot);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { Opcodes.INTEGER }, 0, null);
 
                 // int secondDot = token.indexOf('.', firstDot + 1);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -1201,7 +1188,6 @@ public class DualAuthPatcher {
                 mv.visitVarInsn(Opcodes.ISTORE, 2);
 
                 mv.visitLabel(hasSecondDot);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { Opcodes.INTEGER }, 0, null);
 
                 // String payloadB64 = token.substring(firstDot + 1, secondDot);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -1246,11 +1232,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(foundIss);
-                mv.visitFrame(Opcodes.F_FULL, 7,
-                                new Object[] { "java/lang/String", Opcodes.INTEGER, Opcodes.INTEGER, "java/lang/String",
-                                                "[B",
-                                                "java/lang/String", Opcodes.INTEGER },
-                                0, new Object[] {});
 
                 // int start = payload.indexOf('"', idx + 6) + 1;
                 mv.visitVarInsn(Opcodes.ALOAD, 5);
@@ -1314,7 +1295,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(subTokenNotNull);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // try {
                 Label subTryStart = new Label();
@@ -1338,7 +1318,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(subHasDot);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { Opcodes.INTEGER }, 0, null);
 
                 // int secondDot = token.indexOf('.', firstDot + 1);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -1358,7 +1337,6 @@ public class DualAuthPatcher {
                 mv.visitVarInsn(Opcodes.ISTORE, 2);
 
                 mv.visitLabel(subHasSecondDot);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { Opcodes.INTEGER }, 0, null);
 
                 // String payloadB64 = token.substring(firstDot + 1, secondDot);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -1403,11 +1381,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(subFoundSub);
-                mv.visitFrame(Opcodes.F_FULL, 7,
-                                new Object[] { "java/lang/String", Opcodes.INTEGER, Opcodes.INTEGER, "java/lang/String",
-                                                "[B",
-                                                "java/lang/String", Opcodes.INTEGER },
-                                0, new Object[] {});
 
                 // int start = payload.indexOf('"', idx + 6) + 1;
                 mv.visitVarInsn(Opcodes.ALOAD, 5);
@@ -1435,7 +1408,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(subFoundEnd);
-                mv.visitFrame(Opcodes.F_APPEND, 2, new Object[] { Opcodes.INTEGER, Opcodes.INTEGER }, 0, null);
 
                 // return payload.substring(start, end);
                 mv.visitVarInsn(Opcodes.ALOAD, 5);
@@ -1448,8 +1420,6 @@ public class DualAuthPatcher {
 
                 // } catch (Exception e) { return null; }
                 mv.visitLabel(subCatchHandler);
-                mv.visitFrame(Opcodes.F_FULL, 1, new Object[] { "java/lang/String" }, 1,
-                                new Object[] { "java/lang/Exception" });
                 mv.visitInsn(Opcodes.POP); // pop the exception
                 mv.visitInsn(Opcodes.ACONST_NULL);
                 mv.visitInsn(Opcodes.ARETURN);
@@ -3909,7 +3879,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(notOfficialLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // --- MOVED UP: 4. Configured F2P Check / "Sanasol" Check / Base Domain Check ---
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -3932,12 +3901,10 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(hasF2pToken);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { "java/lang/String" }, 0, null);
                 mv.visitVarInsn(Opcodes.ALOAD, 1);
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(checkOmniLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 5. Omni-Auth Check (WITH JWK SAFETY CHECK)
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, CONTEXT_CLASS, "isOmni", "()Z", false);
@@ -3955,7 +3922,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(falsePositiveOmniLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 // Log warning about false positive
                 mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
                 mv.visitLdcInsn("[DualAuth] Warning: Omni flag true but no JWK found. Proceeding to Dynamic/F2P fallback.");
@@ -3963,7 +3929,6 @@ public class DualAuthPatcher {
                                 false);
 
                 mv.visitLabel(notOmniLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 6. Dynamic/Unknown -> Try Fetch, but FALLBACK to F2P if fetch fails
                 // Check Cache
@@ -3999,12 +3964,10 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.POP);
 
                 mv.visitLabel(returnCachedLabel);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { "java/lang/String" }, 0, null);
                 mv.visitVarInsn(Opcodes.ALOAD, 1);
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(fetchFailedLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 7. HARD FALLBACK: If we couldn't fetch a token, assume it's an alias for the
                 // F2P server
@@ -4077,7 +4040,6 @@ public class DualAuthPatcher {
         mv.visitLdcInsn("/");
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
         mv.visitLabel(addSlashTokenAuto);
-        mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[]{"java/lang/StringBuilder"});
         mv.visitLdcInsn("server/auto-auth");
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
@@ -4122,7 +4084,6 @@ public class DualAuthPatcher {
         mv.visitInsn(Opcodes.ARETURN);
 
         mv.visitLabel(statusOkAuto);
-        mv.visitFrame(Opcodes.F_FULL, 7, new Object[]{"java/lang/String", "java/lang/String", "java/lang/String", "java/lang/String", "java/net/http/HttpClient", "java/net/http/HttpRequest", "java/net/http/HttpResponse"}, 0, null);
         mv.visitVarInsn(Opcodes.ALOAD, 6);
         mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/net/http/HttpResponse", "body", "()Ljava/lang/Object;", true);
         mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String");
@@ -4137,7 +4098,6 @@ public class DualAuthPatcher {
         mv.visitLabel(tryEndAuto);
 
         mv.visitLabel(catchHandlerAuto);
-        mv.visitFrame(Opcodes.F_FULL, 1, new Object[]{"java/lang/String"}, 1, new Object[]{"java/lang/Exception"});
         mv.visitInsn(Opcodes.POP);
         mv.visitInsn(Opcodes.ACONST_NULL);
         mv.visitInsn(Opcodes.ARETURN);
@@ -4160,7 +4120,6 @@ public class DualAuthPatcher {
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, CONTEXT_CLASS, "getIssuer", "()Ljava/lang/String;", false);
                 mv.visitVarInsn(Opcodes.ASTORE, 0);
                 mv.visitLabel(idHasIssuerLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 2. Safeguard: null check -> Fallback to F2P
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -4170,7 +4129,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(idCheckOfficialLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 3. Official Check
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -4184,7 +4142,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(idNotOfficialLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // --- MOVED UP: 4. Configured F2P Check ---
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
@@ -4207,12 +4164,10 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(hasF2pIdToken);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { "java/lang/String" }, 0, null);
                 mv.visitVarInsn(Opcodes.ALOAD, 1);
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(idCheckOmniLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 5. Omni-Auth Check (WITH JWK SAFETY)
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, CONTEXT_CLASS, "isOmni", "()Z", false);
@@ -4229,11 +4184,9 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(idFalsePositiveLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 // Log warning is optional here, already did in session token
 
                 mv.visitLabel(idNotOmniLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
 
                 // 6. HARD FALLBACK: Return F2P token instead of generating self-signed garbage
                 // or returning null
@@ -4253,7 +4206,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ICONST_1);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitLabel(noOfficial);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 mv.visitInsn(Opcodes.ICONST_0);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitMaxs(1, 0);
@@ -4269,7 +4221,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ICONST_1);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitLabel(noF2P);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 mv.visitInsn(Opcodes.ICONST_0);
                 mv.visitInsn(Opcodes.IRETURN);
                 mv.visitMaxs(1, 0);
@@ -4326,7 +4277,6 @@ public class DualAuthPatcher {
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/UUID", "toString", "()Ljava/lang/String;", false);
                 mv.visitVarInsn(Opcodes.ASTORE, 0);
                 mv.visitLabel(hasUuid);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { "java/lang/String" }, 0, null);
 
                 // HttpClient client =
                 // HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
@@ -4428,10 +4378,6 @@ public class DualAuthPatcher {
                                 "(Ljava/lang/String;Ljava/lang/String;)V", false);
 
                 mv.visitLabel(notOk);
-                mv.visitFrame(Opcodes.F_FULL, 5,
-                                new Object[] { "java/lang/String", "java/net/http/HttpClient", "java/lang/String",
-                                                "java/net/http/HttpRequest", "java/net/http/HttpResponse" },
-                                0, new Object[] {});
 
                 mv.visitLabel(tryEnd);
                 Label afterCatch = new Label();
@@ -4439,7 +4385,6 @@ public class DualAuthPatcher {
 
                 // } catch (Exception e) { log error }
                 mv.visitLabel(catchHandler);
-                mv.visitFrame(Opcodes.F_FULL, 0, new Object[] {}, 1, new Object[] { "java/lang/Exception" });
                 mv.visitVarInsn(Opcodes.ASTORE, 0);
                 mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "err", "Ljava/io/PrintStream;");
                 mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
@@ -4458,7 +4403,6 @@ public class DualAuthPatcher {
                                 false);
 
                 mv.visitLabel(afterCatch);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
                 mv.visitInsn(Opcodes.RETURN);
                 mv.visitMaxs(5, 8);
                 mv.visitEnd();
@@ -4500,7 +4444,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(foundIdx);
-                mv.visitFrame(Opcodes.F_APPEND, 2, new Object[] { "java/lang/String", Opcodes.INTEGER }, 0, null);
 
                 // int start = idx + pattern.length();
                 mv.visitVarInsn(Opcodes.ILOAD, 3);
@@ -4560,15 +4503,8 @@ public class DualAuthPatcher {
                 Label afterOfficialLabel = new Label();
                 mv.visitJumpInsn(Opcodes.GOTO, afterOfficialLabel);
                 mv.visitLabel(hasOfficialLabel);
-                mv.visitFrame(Opcodes.F_FULL, 0, new Object[] {}, 3,
-                                new Object[] { "java/io/PrintStream", "java/lang/StringBuilder",
-                                                "java/lang/StringBuilder" });
                 mv.visitLdcInsn("missing");
                 mv.visitLabel(afterOfficialLabel);
-                mv.visitFrame(Opcodes.F_FULL, 0, new Object[] {}, 4,
-                                new Object[] { "java/io/PrintStream", "java/lang/StringBuilder",
-                                                "java/lang/StringBuilder",
-                                                "java/lang/String" });
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
                                 "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;",
@@ -4590,15 +4526,8 @@ public class DualAuthPatcher {
                 Label afterF2PLabel = new Label();
                 mv.visitJumpInsn(Opcodes.GOTO, afterF2PLabel);
                 mv.visitLabel(hasF2PLabel);
-                mv.visitFrame(Opcodes.F_FULL, 0, new Object[] {}, 3,
-                                new Object[] { "java/io/PrintStream", "java/lang/StringBuilder",
-                                                "java/lang/StringBuilder" });
                 mv.visitLdcInsn("missing");
                 mv.visitLabel(afterF2PLabel);
-                mv.visitFrame(Opcodes.F_FULL, 0, new Object[] {}, 4,
-                                new Object[] { "java/io/PrintStream", "java/lang/StringBuilder",
-                                                "java/lang/StringBuilder",
-                                                "java/lang/String" });
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
                                 "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;",
@@ -4681,7 +4610,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(hasJwk);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { "java/lang/String" }, 0, null);
 
                 // Create signed JWT using the embedded JWK as the signing key
                 // Call EmbeddedJwkVerifier.createSignedToken(issuer, jwkString, "identity")
@@ -4736,7 +4664,6 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(hasJwkSession);
-                mv.visitFrame(Opcodes.F_APPEND, 1, new Object[] { "java/lang/String" }, 0, null);
 
                 // Create signed JWT using the embedded JWK as the signing key
                 // Call EmbeddedJwkVerifier.createSignedToken(issuer, jwkString, "session")
