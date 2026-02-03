@@ -5686,6 +5686,41 @@ public class DualAuthPatcher {
                 cr.accept(cn, 0);
                 boolean modified = false;
 
+                // --- DYNAMIC FIELD DETECTION ---
+                // Detect the cache timestamp field to avoid NoSuchFieldError
+                String cacheFieldName = null;
+                String cacheFieldDesc = null;
+
+                for (Object obj : cn.fields) {
+                        FieldNode fn = (FieldNode) obj;
+                        // Prefer Instant type (newer versions)
+                        if (fn.desc.equals("Ljava/time/Instant;") &&
+                                        (fn.name.toLowerCase().contains("refresh")
+                                                        || fn.name.toLowerCase().contains("cache"))) {
+                                cacheFieldName = fn.name;
+                                cacheFieldDesc = fn.desc;
+                                System.out.println("  [JWTValidator] Detected cache field (Instant): " + fn.name);
+                                break;
+                        }
+                        // Fallback to long type (older versions)
+                        else if (fn.desc.equals("J") &&
+                                        (fn.name.toLowerCase().contains("expiry")
+                                                        || fn.name.toLowerCase().contains("refresh")
+                                                        || fn.name.toLowerCase().contains("cache"))) {
+                                // Don't break immediately - prefer Instant if it exists
+                                if (cacheFieldName == null) {
+                                        cacheFieldName = fn.name;
+                                        cacheFieldDesc = fn.desc;
+                                        System.out.println("  [JWTValidator] Detected cache field (long): " + fn.name);
+                                }
+                        }
+                }
+
+                if (cacheFieldName == null) {
+                        System.out.println(
+                                        "  [JWTValidator] WARNING: No cache timestamp field found. Timestamp updates will be skipped.");
+                }
+
                 for (MethodNode mn : cn.methods) {
                         // Patch validateToken, validateSessionToken, validateIdentityToken
                         if (mn.name.startsWith("validate") &&
@@ -6073,7 +6108,7 @@ public class DualAuthPatcher {
 
                         // Existing JWKS fetcher patch
                         if (mn.name.equals("fetchJwksFromService")) {
-                                patchFetchJwksFromService(mn);
+                                patchFetchJwksFromService(mn, cacheFieldName, cacheFieldDesc);
                                 modified = true;
                         }
 
@@ -6282,8 +6317,14 @@ public class DualAuthPatcher {
          * 2. Parse into JwksResponse using existing codec
          * 3. Convert JwksResponse to JWKSet using existing conversion logic
          * 4. Return the JWKSet (or cached value on failure)
+         * 
+         * @param method         The method node to patch
+         * @param cacheFieldName The name of the cache timestamp field (can be null)
+         * @param cacheFieldDesc The descriptor of the cache timestamp field (can be
+         *                       null)
          */
-        private static boolean patchFetchJwksFromService(MethodNode method) {
+        private static boolean patchFetchJwksFromService(MethodNode method, String cacheFieldName,
+                        String cacheFieldDesc) {
                 // Clear existing instructions and replace with our implementation
                 method.instructions.clear();
 
@@ -6516,14 +6557,36 @@ public class DualAuthPatcher {
                 code.add(new FieldInsnNode(Opcodes.PUTFIELD, JWT_VALIDATOR_CLASS, "cachedJwkSet",
                                 "Lcom/nimbusds/jose/jwk/JWKSet;"));
 
-                // this.lastJwksRefresh = Instant.now();
-                // Note: Field changed from jwksCacheExpiry (long) to lastJwksRefresh (Instant)
-                // in newer versions
-                code.add(new VarInsnNode(Opcodes.ALOAD, 0)); // this
-                code.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/time/Instant", "now", "()Ljava/time/Instant;",
-                                false));
-                code.add(new FieldInsnNode(Opcodes.PUTFIELD, JWT_VALIDATOR_CLASS, "lastJwksRefresh",
-                                "Ljava/time/Instant;"));
+                // --- DYNAMIC CACHE TIMESTAMP UPDATE (SAFE) ---
+                // Update cache timestamp only if we detected a valid field
+                if (cacheFieldName != null && cacheFieldDesc != null) {
+                        code.add(new VarInsnNode(Opcodes.ALOAD, 0)); // this
+
+                        if (cacheFieldDesc.equals("Ljava/time/Instant;")) {
+                                // Newer versions: use Instant.now()
+                                code.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/time/Instant", "now",
+                                                "()Ljava/time/Instant;", false));
+                                code.add(new FieldInsnNode(Opcodes.PUTFIELD, JWT_VALIDATOR_CLASS, cacheFieldName,
+                                                "Ljava/time/Instant;"));
+                                System.out.println(
+                                                "  [Patcher] Bytecode: Setting " + cacheFieldName + " = Instant.now()");
+                        } else if (cacheFieldDesc.equals("J")) {
+                                // Older versions: use System.currentTimeMillis()
+                                code.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System",
+                                                "currentTimeMillis", "()J", false));
+                                code.add(new FieldInsnNode(Opcodes.PUTFIELD, JWT_VALIDATOR_CLASS, cacheFieldName, "J"));
+                                System.out.println("  [Patcher] Bytecode: Setting " + cacheFieldName
+                                                + " = System.currentTimeMillis()");
+                        } else {
+                                // Unexpected type - skip the timestamp update
+                                code.add(new InsnNode(Opcodes.POP)); // Remove 'this' from stack
+                                System.out.println("  [Patcher] Bytecode WARNING: Unknown field type '" + cacheFieldDesc
+                                                + "' for " + cacheFieldName + ", timestamp not updated.");
+                        }
+                } else {
+                        System.out.println(
+                                        "  [Patcher] Bytecode WARNING: Cache timestamp field NOT FOUND. Skipping update.");
+                }
 
                 // Log final success
                 code.add(new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;"));
