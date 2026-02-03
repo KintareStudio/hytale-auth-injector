@@ -4449,6 +4449,7 @@ public class DualAuthPatcher {
 
                 mv.visitLabel(hasOfficialIdentityToken);
                 mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+                mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
                 mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
                 mv.visitInsn(Opcodes.DUP);
                 mv.visitLdcInsn("[DualAuth] Issuer is official ");
