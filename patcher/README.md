@@ -7,7 +7,7 @@ Bytecode patcher that enables Hytale servers to accept authentication from **bot
 ## Features
 
 - **True Dual Auth**: Official Hytale clients AND F2P clients can connect to the same server
-- **Omni-Auth (Decentralized)**: Automatically trusts and validates players using ANY auth authority by extracting embedded JWKs from their tokens.
+- **[Omni-Auth (Decentralized)](OMNI_AUTH.md)**: Automatically trusts and validates players using ANY auth authority by extracting embedded JWKs from their tokens. See [OMNI_AUTH.md](OMNI_AUTH.md) for implementation details.
 - **Two-Level JWKS Cache**: 
     - **Transient Cache**: Instant trust for decentralized/per-request keys.
     - **Network Cache**: Multi-backend (Hytale + F2P) keys cached for 1 hour to prevent redundant fetch latency.
@@ -202,6 +202,10 @@ JAR structure doesn't match expected classes. Check:
 - **v8.0**: Issuer-based routing for token refresh, profile lookup support
 - **v7.0**: DualJwksFetcher for merged JWKS
 - **v6.0**: True dual auth with context-based routing
+
+## Documentation
+
+- **[OMNI_AUTH.md](OMNI_AUTH.md)** - Complete Omni-Auth implementation guide with code examples (Python, Node.js, Rust)
 
 ## Related Projects
 

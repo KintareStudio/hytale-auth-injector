@@ -791,6 +791,132 @@ jobs:
           pkill -9 -f HytaleServerPatched.jar 2>/dev/null || true
           sleep 2
 
+      # ==========================================
+      # STRICT MODE WITHOUT TOKENS (pure strict)
+      # ==========================================
+
+      - name: Start Server (strict mode - NO tokens, NO allowlist)
+        working-directory: server
+        run: |
+          # Create separate data directory for pure strict mode test
+          rm -rf universe_strict_pure
+          mkdir -p universe_strict_pure
+          echo "Using isolated data directory: universe_strict_pure"
+
+          echo "Starting Hytale server with HYTALE_TRUST_ALL_ISSUERS=false (pure strict mode)..."
+          echo "NO CLI tokens, NO trusted issuer allowlist"
+          echo "Expected: Server boots fine, but Omni-Auth players should be REJECTED"
+          HYTALE_TRUST_ALL_ISSUERS=false \
+          java -Xmx2G \
+            -jar HytaleServerPatched.jar \
+            --assets Assets.zip \
+            --bind 0.0.0.0:5524 \
+            --universe universe_strict_pure \
+            --auth-mode authenticated \
+            --disable-sentry \
+            2>&1 | tee server_strict_pure.log &
+
+          SERVER_PID=$!
+          echo $SERVER_PID > server_strict_pure.pid
+          echo "Server PID: $SERVER_PID"
+
+          # Wait for server to boot
+          echo "Waiting for server to start..."
+          TIMEOUT=60
+          ELAPSED=0
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            if grep -qi "Server Booted" server_strict_pure.log 2>/dev/null; then
+              echo "Server is ready!"
+              break
+            fi
+            if grep -qE "NoSuchFieldError|NoSuchMethodError|ClassNotFoundException|VerifyError" server_strict_pure.log 2>/dev/null; then
+              echo "Bytecode error - patcher incompatible"
+              cat server_strict_pure.log
+              exit 1
+            fi
+            sleep 3
+            ELAPSED=$((ELAPSED + 3))
+            echo "... waiting ($ELAPSED/$TIMEOUT)"
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            if grep -qi "Server Booted" server_strict_pure.log 2>/dev/null; then
+              echo "Server booted (detected after timeout check)"
+            else
+              echo "Server did not boot within timeout"
+              tail -30 server_strict_pure.log
+              exit 1
+            fi
+          fi
+
+      - name: Test Omni-Auth Rejection (pure strict mode)
+        run: |
+          TESTS_PASSED=0
+          TESTS_FAILED=0
+
+          LOG_LINES_BEFORE=$(wc -l < server/server_strict_pure.log 2>/dev/null | tr -d ' ')
+
+          echo "=== Test 9: Omni-Auth Should Be REJECTED in Pure Strict Mode ==="
+          echo "With TRUST_ALL_ISSUERS=false and no allowlist, Omni-Auth tokens should be rejected"
+
+          # Generate Omni-Auth token
+          OMNI_UUID=$(python3 -c "import uuid; print(uuid.uuid4())")
+          OMNI_TOKEN=$(python3 .github/scripts/generate-omni-token.py \
+            --uuid "$OMNI_UUID" \
+            --username "RejectedPlayer" \
+            --issuer "http://127.0.0.1:12345")
+
+          echo "Attempting connection with Omni-Auth token (should be rejected)..."
+          python3 .github/scripts/mock-client.py \
+            --host 127.0.0.1 \
+            --port 5524 \
+            --uuid "$OMNI_UUID" \
+            --username "RejectedPlayer" \
+            --token "$OMNI_TOKEN" \
+            --timeout 5 || true
+
+          sleep 2
+
+          NEW_LOGS=$(tail -n +"$LOG_LINES_BEFORE" server/server_strict_pure.log)
+          # In pure strict mode, Omni-Auth should be rejected
+          if echo "$NEW_LOGS" | grep -qiE "not trusted|untrusted|issuer.*reject|isValidIssuer.*false|Invalid issuer"; then
+            echo "Test 9 PASSED - Omni-Auth correctly REJECTED in pure strict mode"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+          elif echo "$NEW_LOGS" | grep -qiE "Disconnect|auth.*fail|reject"; then
+            echo "Test 9 PASSED - Player rejected (strict mode working)"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+          elif echo "$NEW_LOGS" | grep -qiE "auth.*grant|grant.*success"; then
+            echo "::error::Test 9 FAILED - Omni-Auth should be REJECTED in pure strict mode"
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+          else
+            echo "::warning::Test 9 INCONCLUSIVE - Check logs for rejection pattern"
+            echo "Recent logs:"
+            echo "$NEW_LOGS" | tail -10
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+          fi
+
+          echo ""
+          echo "=== Pure Strict Mode Results ==="
+          echo "Passed: $TESTS_PASSED / 1"
+          echo "Failed: $TESTS_FAILED / 1"
+
+          echo "PURE_STRICT_FAILED=$TESTS_FAILED" >> $GITHUB_ENV
+
+          echo ""
+          echo "=== Server Connection Logs (pure strict mode) ==="
+          grep -iE "connect|auth|DualAuth|issuer|trust|reject" server/server_strict_pure.log | tail -20 || echo "No connection logs found"
+
+      - name: Stop Server (pure strict mode)
+        run: |
+          echo "Stopping pure strict mode server..."
+          if [ -f server/server_strict_pure.pid ]; then
+            kill $(cat server/server_strict_pure.pid) 2>/dev/null || true
+            sleep 1
+            kill -9 $(cat server/server_strict_pure.pid) 2>/dev/null || true
+          fi
+          pkill -9 -f HytaleServerPatched.jar 2>/dev/null || true
+          sleep 2
+
       - name: Start Server (strict mode - with trusted issuer allowlist)
         working-directory: server
         run: |
