@@ -4602,10 +4602,8 @@ public class DualAuthPatcher {
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Boolean", "parseBoolean", "(Ljava/lang/String;)Z", false);
         mv.visitJumpInsn(Opcodes.IFNE, allowOmniBypass);
 
-        mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-        mv.visitLdcInsn("[DualAuth] Omni-Auth rejected (HYTALE_TRUST_ALL_ISSUERS=false)");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
-
+        // TRUST_ALL_ISSUERS=false - check TRUSTED_ISSUERS before rejecting
+        // First, parse the claims to get the issuer
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
         mv.visitInsn(Opcodes.ICONST_1);
@@ -4624,7 +4622,20 @@ public class DualAuthPatcher {
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "com/nimbusds/jwt/JWTClaimsSet", "parse",
                 "(Ljava/lang/String;)Lcom/nimbusds/jwt/JWTClaimsSet;", false);
         mv.visitVarInsn(Opcodes.ASTORE, 14);
+
+        // Get issuer from claims and check TRUSTED_ISSUERS
         mv.visitVarInsn(Opcodes.ALOAD, 14);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "com/nimbusds/jwt/JWTClaimsSet", "getIssuer",
+                "()Ljava/lang/String;", false);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, HELPER_CLASS, "isOmniIssuerTrusted",
+                "(Ljava/lang/String;)Z", false);
+        mv.visitJumpInsn(Opcodes.IFNE, allowOmniBypass); // If trusted, do proper verification
+
+        // Not in TRUSTED_ISSUERS - reject
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+        mv.visitLdcInsn("[DualAuth] Omni-Auth rejected (HYTALE_TRUST_ALL_ISSUERS=false, issuer not in TRUSTED_ISSUERS)");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+        mv.visitInsn(Opcodes.ACONST_NULL);
         mv.visitInsn(Opcodes.ARETURN);
 
         mv.visitLabel(allowOmniBypass);
