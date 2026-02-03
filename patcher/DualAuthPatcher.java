@@ -2214,79 +2214,15 @@ public class DualAuthPatcher {
                 mv.visitMaxs(6, 6);
                 mv.visitEnd();
 
-                // --- NEW: extractKeysContent(String json) -> String ---
-                // Moving helper here to avoid NoSuchMethodError in JwksFetcher (Linkage issues)
-                mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
-                                "extractKeysContent", "(Ljava/lang/String;)Ljava/lang/String;", null, null);
-                mv.visitCode();
-                Label errLabel = new Label();
-
-                // if (json == null) return "";
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                Label nullCheck = new Label();
-                mv.visitJumpInsn(Opcodes.IFNONNULL, nullCheck);
-                mv.visitLdcInsn("");
-                mv.visitInsn(Opcodes.ARETURN);
-                mv.visitLabel(nullCheck);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-
-                // int idx = json.indexOf("\"keys\":");
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitLdcInsn("\"keys\":");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf",
-                                "(Ljava/lang/String;)I", false);
-                mv.visitVarInsn(Opcodes.ISTORE, 1);
-
-                // int start = json.indexOf('[', idx);
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitIntInsn(Opcodes.BIPUSH, '[');
-                mv.visitVarInsn(Opcodes.ILOAD, 1);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf", "(II)I", false);
-                mv.visitVarInsn(Opcodes.ISTORE, 2);
-
-                // int end = json.lastIndexOf(']');
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitIntInsn(Opcodes.BIPUSH, ']');
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "lastIndexOf", "(I)I", false);
-                mv.visitVarInsn(Opcodes.ISTORE, 3);
-
-                // Check if found and valid
-                mv.visitVarInsn(Opcodes.ILOAD, 1);
-                mv.visitInsn(Opcodes.ICONST_M1);
-                mv.visitJumpInsn(Opcodes.IF_ICMPEQ, errLabel);
-                mv.visitVarInsn(Opcodes.ILOAD, 2);
-                mv.visitInsn(Opcodes.ICONST_M1);
-                mv.visitJumpInsn(Opcodes.IF_ICMPEQ, errLabel);
-                mv.visitVarInsn(Opcodes.ILOAD, 3);
-                mv.visitVarInsn(Opcodes.ILOAD, 2);
-                mv.visitJumpInsn(Opcodes.IF_ICMPLE, errLabel);
-
-                // String keysContent = json.substring(start + 1, end).trim();
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitVarInsn(Opcodes.ILOAD, 2);
-                mv.visitInsn(Opcodes.ICONST_1);
-                mv.visitInsn(Opcodes.IADD);
-                mv.visitVarInsn(Opcodes.ILOAD, 3);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "substring",
-                                "(II)Ljava/lang/String;", false);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "trim", "()Ljava/lang/String;",
-                                false);
-                mv.visitInsn(Opcodes.ARETURN);
-
-                mv.visitLabel(errLabel);
-                mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-                mv.visitLdcInsn("");
-                mv.visitInsn(Opcodes.ARETURN);
-                mv.visitMaxs(4, 4);
-                mv.visitEnd();
-
                 cw.visitEnd();
                 return cw.toByteArray();
         }
 
+
         /**
-         * Generate DualJwksFetcher class - High Performance Segregated Cache.
-         * v9.2.1 FIX: Defines extractKeysContent BEFORE callers to ensure linkage.
+         * Generate DualJwksFetcher class - Fetches and merges JWKS
+         * 
+         * v10.0 FIX: restore extractKeysContent internally and put it FIRST.
          */
         private static byte[] generateDualJwksFetcher() {
         ClassWriter cw = new SafeClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
@@ -2346,6 +2282,71 @@ public class DualAuthPatcher {
         mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(1, 1);
+        mv.visitEnd();
+
+        // --- DEFINE extractKeysContent FIRST (before callers) ---
+        mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                        "extractKeysContent", "(Ljava/lang/String;)Ljava/lang/String;", null, null);
+        mv.visitCode();
+        Label errLabel = new Label();
+
+        // if (json == null) return "";
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        Label nullCheck = new Label();
+        mv.visitJumpInsn(Opcodes.IFNONNULL, nullCheck);
+        mv.visitLdcInsn("");
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitLabel(nullCheck);
+        mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+
+        // int idx = json.indexOf("\"keys\":");
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn("\"keys\":");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf",
+                        "(Ljava/lang/String;)I", false);
+        mv.visitVarInsn(Opcodes.ISTORE, 1);
+
+        // int start = json.indexOf('[', idx);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitIntInsn(Opcodes.BIPUSH, '[');
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf", "(II)I", false);
+        mv.visitVarInsn(Opcodes.ISTORE, 2);
+
+        // int end = json.lastIndexOf(']');
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitIntInsn(Opcodes.BIPUSH, ']');
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "lastIndexOf", "(I)I", false);
+        mv.visitVarInsn(Opcodes.ISTORE, 3);
+
+        // Check if found and valid
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitInsn(Opcodes.ICONST_M1);
+        mv.visitJumpInsn(Opcodes.IF_ICMPEQ, errLabel);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitInsn(Opcodes.ICONST_M1);
+        mv.visitJumpInsn(Opcodes.IF_ICMPEQ, errLabel);
+        mv.visitVarInsn(Opcodes.ILOAD, 3);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitJumpInsn(Opcodes.IF_ICMPLE, errLabel);
+
+        // String keysContent = json.substring(start + 1, end).trim();
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitInsn(Opcodes.ICONST_1);
+        mv.visitInsn(Opcodes.IADD);
+        mv.visitVarInsn(Opcodes.ILOAD, 3);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "substring",
+                        "(II)Ljava/lang/String;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "trim", "()Ljava/lang/String;",
+                        false);
+        mv.visitInsn(Opcodes.ARETURN);
+
+        mv.visitLabel(errLabel);
+        mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
+        mv.visitLdcInsn("");
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(4, 4);
         mv.visitEnd();
 
         // -------------------------------------------------------------
@@ -2670,71 +2671,6 @@ public class DualAuthPatcher {
         mv.visitMaxs(3, 4);
         mv.visitEnd();
 
-        // --- RESTORED METHOD DEFINITION IN THIS CLASS ---
-        // public static String extractKeysContent(String json)
-        mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
-                        "extractKeysContent", "(Ljava/lang/String;)Ljava/lang/String;", null, null);
-        mv.visitCode();
-        Label errLabel = new Label();
-
-        // if (json == null) return "";
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        Label nullCheck = new Label();
-        mv.visitJumpInsn(Opcodes.IFNONNULL, nullCheck);
-        mv.visitLdcInsn("");
-        mv.visitInsn(Opcodes.ARETURN);
-        mv.visitLabel(nullCheck);
-        mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-
-        // int idx = json.indexOf("\"keys\":");
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitLdcInsn("\"keys\":");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf",
-                        "(Ljava/lang/String;)I", false);
-        mv.visitVarInsn(Opcodes.ISTORE, 1);
-
-        // int start = json.indexOf('[', idx);
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitIntInsn(Opcodes.BIPUSH, '[');
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf", "(II)I", false);
-        mv.visitVarInsn(Opcodes.ISTORE, 2);
-
-        // int end = json.lastIndexOf(']');
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitIntInsn(Opcodes.BIPUSH, ']');
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "lastIndexOf", "(I)I", false);
-        mv.visitVarInsn(Opcodes.ISTORE, 3);
-
-        // Check if found and valid
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitInsn(Opcodes.ICONST_M1);
-        mv.visitJumpInsn(Opcodes.IF_ICMPEQ, errLabel);
-        mv.visitVarInsn(Opcodes.ILOAD, 2);
-        mv.visitInsn(Opcodes.ICONST_M1);
-        mv.visitJumpInsn(Opcodes.IF_ICMPEQ, errLabel);
-        mv.visitVarInsn(Opcodes.ILOAD, 3);
-        mv.visitVarInsn(Opcodes.ILOAD, 2);
-        mv.visitJumpInsn(Opcodes.IF_ICMPLE, errLabel);
-
-        // String keysContent = json.substring(start + 1, end).trim();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ILOAD, 2);
-        mv.visitInsn(Opcodes.ICONST_1);
-        mv.visitInsn(Opcodes.IADD);
-        mv.visitVarInsn(Opcodes.ILOAD, 3);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "substring",
-                        "(II)Ljava/lang/String;", false);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "trim", "()Ljava/lang/String;",
-                        false);
-        mv.visitInsn(Opcodes.ARETURN);
-
-        mv.visitLabel(errLabel);
-        mv.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
-        mv.visitLdcInsn("");
-        mv.visitInsn(Opcodes.ARETURN);
-        mv.visitMaxs(4, 4);
-        mv.visitEnd();
 
         cw.visitEnd();
         return cw.toByteArray();
