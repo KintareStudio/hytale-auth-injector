@@ -184,35 +184,16 @@ public class DualServerTokenManager {
             return f2pIdentityToken != null ? f2pIdentityToken : officialIdentityToken;
         }
 
-        // 1. Official Check
-        if (DualAuthHelper.isOfficialIssuer(issuer)) {
+        // PATCHER STRATEGY: Only hytale.com issuers provide identity tokens
+        if (DualAuthHelper.isOfficialIssuerStrict(issuer)) {
             return officialIdentityToken;
         }
 
-        // 2. CRITICAL: For non-official issuers, we MUST generate a dynamic token
-        // The token from /server/auto-auth is for SERVER authentication with the backend,
-        // NOT for CLIENT validation. The client needs a token where:
-        //   - sub = server UUID (from Sanasol)
-        //   - aud = player UUID (the connecting client)
-        //   - iss = the player's issuer
-        // This is ALWAYS required for Hytale's mTLS handshake.
-        
-        String dynamicToken = DualServerIdentity.createDynamicIdentityToken(issuer, playerUuid);
-        if (dynamicToken != null) {
-            if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] Generated dynamic server identity for player " + playerUuid + " from issuer " + issuer);
-            }
-            return dynamicToken;
+        // For non-official issuers, return null to suppress server identity
+        if (Boolean.getBoolean("dualauth.debug")) {
+            System.out.println("[DualAuth] Suppressing server identity token for non-official issuer: " + issuer);
         }
-
-        // 3. Fallback to cached F2P token (will likely fail client validation)
-        if (f2pIdentityToken != null) {
-            LOGGER.warning("[DualAuth] Using F2P fallback token - may cause 'invalid payload' on client");
-            return f2pIdentityToken;
-        }
-
-        // 4. Last resort: cached federated token
-        return issuerIdentityCache.get(issuer);
+        return null;
     }
 
     /**

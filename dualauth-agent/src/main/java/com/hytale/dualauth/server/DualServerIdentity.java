@@ -100,62 +100,21 @@ public class DualServerIdentity {
         if (issuer == null) issuer = DualAuthContext.getIssuer();
         if (issuer == null) issuer = DualAuthConfig.F2P_ISSUER;
         
-        // If we have an embedded JWK in context (Omni-Auth), use that
-        if (DualAuthContext.isOmni()) {
-            String token = EmbeddedJwkVerifier.createDynamicIdentityToken(issuer);
-            if (token != null) return token;
-        }
-
-        // Use provided player UUID or fallback to context
-        String aud = playerUuid;
-        if (aud == null) aud = DualAuthContext.getPlayerUuid();
-        if (aud == null || aud.isEmpty()) aud = UUID.randomUUID().toString();
-        
-        String sub = DualAuthHelper.getServerUuid();
-
-        // STRATEGY: Generate a self-signed token with embedded JWK
-        // Since we cannot modify the backend to sign tokens for specific players,
-        // we must sign them ourselves and include the public key in the header.
-        // The Hytale client (and Omni-Auth) supports this via the 'jwk' header parameter.
-        try {
-            OctetKeyPair kp = getOrCreateSelfSignedKeyPair();
-
-            // DEBUG: Log all claims for troubleshooting
+        // PATCHER STRATEGY: Only generate tokens for official issuers if needed (though usually captured)
+        if (!DualAuthHelper.isOfficialIssuerStrict(issuer)) {
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] Creating self-signed server identity token (embedded JWK):");
-                System.out.println("[DualAuth]   iss (issuer): " + issuer);
-                System.out.println("[DualAuth]   sub (server UUID): " + sub);
-                System.out.println("[DualAuth]   aud (player UUID): " + aud);
-                System.out.println("[DualAuth]   kid (key ID): " + kp.getKeyID());
+                System.out.println("[DualAuth] Skipping dynamic server identity token for non-official issuer: " + issuer);
             }
-
-            // Get actual server name instead of generic
-            String serverName = DualAuthHelper.getServerName();
-            if (serverName == null || serverName.isEmpty()) {
-                serverName = "Server-" + sub.substring(0, 8); // Fallback: Server-UUID-prefix
-            }
-
-            JWTClaimsSet claims = new JWTClaimsSet.Builder()
-                .issuer(issuer)
-                .subject(sub)
-                .audience(aud) // CRITICAL: Audience must be the Player's UUID
-                .issueTime(new Date())
-                .expirationTime(new Date(System.currentTimeMillis() + 3600000L))
-                .claim("scope", "hytale:server hytale:client") // Include both scopes
-                .claim("entitlements", Arrays.asList("game.base", "server.host")) // Add entitlements
-                .claim("username", serverName) // Use actual server name
-                .claim("profile", Map.of("username", serverName)) // Use actual server name
-                .build();
-
-            String header = Base64URL.encode("{\"alg\":\"EdDSA\",\"typ\":\"JWT\",\"kid\":\"" + kp.getKeyID() + "\",\"jwk\":" + kp.toPublicJWK().toJSONString() + "}").toString();
-            String payload = Base64URL.encode(claims.toJSONObject().toString()).toString();
-            
-            return signNative(header + "." + payload, kp);
-        } catch (Exception e) { 
-            LOGGER.log(Level.WARNING, "[DualAuth] Failed to create dynamic identity token: " + e.getMessage());
-            return null; 
+            return null;
         }
+        
+        // For official issuers, typically tokens come from official flow.
+        if (Boolean.getBoolean("dualauth.debug")) {
+            System.out.println("[DualAuth] Dynamic server identity generation not needed for official issuer: " + issuer);
+        }
+        return null; // Original patcher flow doesn't generate them dynamically for official either
     }
+
 
     private static String fetchUrl(String urlString) {
         HttpURLConnection conn = null;

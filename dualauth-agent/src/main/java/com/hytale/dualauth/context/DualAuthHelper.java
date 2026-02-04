@@ -41,6 +41,12 @@ public class DualAuthHelper {
         return issuer.contains(DualAuthConfig.OFFICIAL_DOMAIN);
     }
 
+    public static boolean isOfficialIssuerStrict(String issuer) {
+        // Patchers: only hytale.com is considered official for server identity purposes
+        if (issuer == null) return false;
+        return issuer.contains(DualAuthConfig.OFFICIAL_DOMAIN);
+    }
+
     public static boolean isValidIssuer(String issuer) {
         if (issuer == null) return false;
         String norm = issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
@@ -344,34 +350,26 @@ public class DualAuthHelper {
             String issuer = DualAuthContext.getIssuer();
             if (issuer == null && currentToken != null) {
                 issuer = extractIssuerFromToken(currentToken);
+            }
+
+            // 3. PATCHER STRATEGY: Only hytale.com sends serverIdentityToken
+            // For non-official issuers (Sanasol, etc.), suppress server identity to bypass client validation
+            if (issuer != null && !isOfficialIssuerStrict(issuer)) {
+                // Suppress server identity for non-official issuers
+                idField.set(authGrant, null);
                 if (Boolean.getBoolean("dualauth.debug")) {
-                    System.out.println("[DualAuth] AuthGrant: Recovered issuer from token: " + issuer);
+                    System.out.println("[DualAuth] AuthGrant: Suppressed serverIdentityToken for non-official issuer: " + issuer);
+                }
+                return;
+            }
+
+            // 4. For official issuers, keep existing token
+            if (issuer != null && isOfficialIssuerStrict(issuer)) {
+                if (Boolean.getBoolean("dualauth.debug")) {
+                    System.out.println("[DualAuth] AuthGrant: Keeping serverIdentityToken for official issuer: " + issuer);
                 }
             }
 
-            if (issuer != null && !isOfficialIssuer(issuer)) {
-                // Try to get player UUID from context
-                String playerUuid = DualAuthContext.getPlayerUuid();
-                
-                String rep = DualServerTokenManager.getIdentityTokenForIssuer(issuer, playerUuid);
-                if (rep != null) {
-                    idField.set(authGrant, rep);
-                    if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] AuthGrant: Replaced server identity token for " + issuer + (playerUuid != null ? " (Player: " + playerUuid + ")" : ""));
-                    }
-                } else {
-                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] AuthGrant: No replacement token found for issuer: " + issuer);
-                    }
-                }
-            } else {
-                 if (Boolean.getBoolean("dualauth.debug")) {
-                     // Only log if we have a token but decided not to replace (official or unknown)
-                     if (currentToken != null) {
-                        System.out.println("[DualAuth] AuthGrant: Skipping replacement. Issuer: " + issuer + ", IsOfficial: " + isOfficialIssuer(issuer));
-                     }
-                }
-            }
         } catch (Exception e) {
              if (Boolean.getBoolean("dualauth.debug")) {
                 System.out.println("[DualAuth] AuthGrant: Error in maybeReplaceServerIdentity: " + e.getMessage());
