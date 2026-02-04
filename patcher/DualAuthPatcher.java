@@ -762,13 +762,11 @@ public class DualAuthPatcher {
                 mv = cw.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
                 mv.visitCode();
 
-                // 1. Get HYTALE_AUTH_DOMAIN from ENV
+                // 1. Get HYTALE_AUTH_DOMAIN
                 mv.visitLdcInsn("HYTALE_AUTH_DOMAIN");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "getenv",
-                                "(Ljava/lang/String;)Ljava/lang/String;", false);
-                mv.visitVarInsn(Opcodes.ASTORE, 0); // env
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "getenv", "(Ljava/lang/String;)Ljava/lang/String;", false);
+                mv.visitVarInsn(Opcodes.ASTORE, 0);
 
-                // 2. Fallback to default if null or empty
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 Label hasEnv = new Label();
                 mv.visitJumpInsn(Opcodes.IFNONNULL, hasEnv);
@@ -780,54 +778,56 @@ public class DualAuthPatcher {
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "trim", "()Ljava/lang/String;", false);
                 mv.visitVarInsn(Opcodes.ASTORE, 0);
 
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "isEmpty", "()Z", false);
-                Label notEmpty = new Label();
-                mv.visitJumpInsn(Opcodes.IFEQ, notEmpty);
-                mv.visitLdcInsn("auth.sanasol.ws");
-                mv.visitVarInsn(Opcodes.ASTORE, 0);
-                mv.visitLabel(notEmpty);
-
                 // Save F2P_DOMAIN
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, HELPER_CLASS, "F2P_DOMAIN", "Ljava/lang/String;");
 
-                // 3. Extract F2P_BASE_DOMAIN
-                // int firstDot = domain.indexOf('.');
+                // 2. Extract F2P_BASE_DOMAIN (Improved IP handling)
+                // if (Character.isDigit(domain.charAt(0))) base = domain; else ...
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitInsn(Opcodes.ICONST_0);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "charAt", "(I)C", false);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Character", "isDigit", "(C)Z", false);
+                Label isIp = new Label();
+                mv.visitJumpInsn(Opcodes.IFNE, isIp);
+
+                // Domain parsing logic
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitIntInsn(Opcodes.BIPUSH, '.');
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf", "(I)I", false);
-                mv.visitVarInsn(Opcodes.ISTORE, 2); // firstDot
+                mv.visitVarInsn(Opcodes.ISTORE, 1); // firstDot
 
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitVarInsn(Opcodes.ASTORE, 3); // base (default is domain)
+                mv.visitVarInsn(Opcodes.ASTORE, 2); // base
 
-                mv.visitVarInsn(Opcodes.ILOAD, 2);
-                Label noDot = new Label();
-                mv.visitJumpInsn(Opcodes.IFLE, noDot);
+                mv.visitVarInsn(Opcodes.ILOAD, 1);
+                Label doneParsing = new Label();
+                mv.visitJumpInsn(Opcodes.IFLE, doneParsing);
 
-                // String afterFirstDot = domain.substring(firstDot + 1);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitVarInsn(Opcodes.ILOAD, 2);
+                mv.visitVarInsn(Opcodes.ILOAD, 1);
                 mv.visitInsn(Opcodes.ICONST_1);
                 mv.visitInsn(Opcodes.IADD);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "substring", "(I)Ljava/lang/String;",
-                                false);
-                mv.visitVarInsn(Opcodes.ASTORE, 4); // afterFirstDot
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "substring", "(I)Ljava/lang/String;", false);
+                mv.visitVarInsn(Opcodes.ASTORE, 3); // candidate
 
-                // if (afterFirstDot.indexOf('.') > 0) base = afterFirstDot;
-                mv.visitVarInsn(Opcodes.ALOAD, 4);
+                mv.visitVarInsn(Opcodes.ALOAD, 3);
                 mv.visitIntInsn(Opcodes.BIPUSH, '.');
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "indexOf", "(I)I", false);
-                mv.visitJumpInsn(Opcodes.IFLE, noDot);
-                mv.visitVarInsn(Opcodes.ALOAD, 4);
-                mv.visitVarInsn(Opcodes.ASTORE, 3);
-
-                mv.visitLabel(noDot);
+                mv.visitJumpInsn(Opcodes.IFLE, doneParsing);
                 mv.visitVarInsn(Opcodes.ALOAD, 3);
+                mv.visitVarInsn(Opcodes.ASTORE, 2);
+                mv.visitJumpInsn(Opcodes.GOTO, doneParsing);
+
+                mv.visitLabel(isIp);
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitVarInsn(Opcodes.ASTORE, 2);
+
+                mv.visitLabel(doneParsing);
+                mv.visitVarInsn(Opcodes.ALOAD, 2);
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, HELPER_CLASS, "F2P_BASE_DOMAIN", "Ljava/lang/String;");
 
-                // 4. Calculate Protocol (Check 127. or localhost)
+                // 3. Protocol
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitLdcInsn("127.");
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "startsWith", "(Ljava/lang/String;)Z",
@@ -837,104 +837,79 @@ public class DualAuthPatcher {
 
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 mv.visitLdcInsn("localhost");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains",
-                                "(Ljava/lang/CharSequence;)Z", false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains", "(Ljava/lang/CharSequence;)Z", false);
                 mv.visitJumpInsn(Opcodes.IFNE, isHttp);
 
-                // Default HTTPS
                 mv.visitLdcInsn("https");
-                mv.visitVarInsn(Opcodes.ASTORE, 1);
+                mv.visitVarInsn(Opcodes.ASTORE, 3);
                 Label protoDone = new Label();
                 mv.visitJumpInsn(Opcodes.GOTO, protoDone);
 
-                // HTTP for local
                 mv.visitLabel(isHttp);
                 mv.visitLdcInsn("http");
-                mv.visitVarInsn(Opcodes.ASTORE, 1);
+                mv.visitVarInsn(Opcodes.ASTORE, 3);
 
                 mv.visitLabel(protoDone);
 
-                // 5. Construct F2P_URL = proto + "://" + domain
+                // 4. Build F2P_URL
                 mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
                 mv.visitInsn(Opcodes.DUP);
                 mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
-                mv.visitVarInsn(Opcodes.ALOAD, 1);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                mv.visitVarInsn(Opcodes.ALOAD, 3);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
                 mv.visitLdcInsn("://");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;",
-                                false);
-                mv.visitInsn(Opcodes.DUP); // Keep copy for ISSUER
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
+                mv.visitInsn(Opcodes.DUP);
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, HELPER_CLASS, "F2P_URL", "Ljava/lang/String;");
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, HELPER_CLASS, "F2P_ISSUER", "Ljava/lang/String;");
 
-                // 6. Set Official Constants
+                // 5. Official Constants
                 mv.visitLdcInsn("HYTALE_OFFICIAL_URL");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "getenv",
-                                "(Ljava/lang/String;)Ljava/lang/String;", false);
-                mv.visitVarInsn(Opcodes.ASTORE, 5); // offUrl
-
-                mv.visitVarInsn(Opcodes.ALOAD, 5);
-                Label hasOffUrl = new Label();
-                mv.visitJumpInsn(Opcodes.IFNONNULL, hasOffUrl);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "getenv", "(Ljava/lang/String;)Ljava/lang/String;", false);
+                mv.visitVarInsn(Opcodes.ASTORE, 4);
+                mv.visitVarInsn(Opcodes.ALOAD, 4);
+                Label hasOff = new Label();
+                mv.visitJumpInsn(Opcodes.IFNONNULL, hasOff);
                 mv.visitLdcInsn("https://sessions.hytale.com");
-                mv.visitVarInsn(Opcodes.ASTORE, 5);
-                mv.visitLabel(hasOffUrl);
-
-                mv.visitVarInsn(Opcodes.ALOAD, 5);
+                mv.visitVarInsn(Opcodes.ASTORE, 4);
+                mv.visitLabel(hasOff);
+                mv.visitVarInsn(Opcodes.ALOAD, 4);
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, HELPER_CLASS, "OFFICIAL_URL", "Ljava/lang/String;");
-                mv.visitVarInsn(Opcodes.ALOAD, 5);
+                mv.visitVarInsn(Opcodes.ALOAD, 4);
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, HELPER_CLASS, "OFFICIAL_ISSUER", "Ljava/lang/String;");
 
                 mv.visitLdcInsn("HYTALE_OFFICIAL_DOMAIN");
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "getenv",
-                                "(Ljava/lang/String;)Ljava/lang/String;", false);
-                mv.visitVarInsn(Opcodes.ASTORE, 6); // offDomain
-
-                mv.visitVarInsn(Opcodes.ALOAD, 6);
-                Label hasOffDomain = new Label();
-                mv.visitJumpInsn(Opcodes.IFNONNULL, hasOffDomain);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "getenv", "(Ljava/lang/String;)Ljava/lang/String;", false);
+                mv.visitVarInsn(Opcodes.ASTORE, 5);
+                mv.visitVarInsn(Opcodes.ALOAD, 5);
+                Label hasOffD = new Label();
+                mv.visitJumpInsn(Opcodes.IFNONNULL, hasOffD);
                 mv.visitLdcInsn("hytale.com");
-                mv.visitVarInsn(Opcodes.ASTORE, 6);
-                mv.visitLabel(hasOffDomain);
-
-                mv.visitVarInsn(Opcodes.ALOAD, 6);
+                mv.visitVarInsn(Opcodes.ASTORE, 5);
+                mv.visitLabel(hasOffD);
+                mv.visitVarInsn(Opcodes.ALOAD, 5);
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, HELPER_CLASS, "OFFICIAL_DOMAIN", "Ljava/lang/String;");
 
-                // Print Config
+                // Log
                 mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
                 mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
                 mv.visitInsn(Opcodes.DUP);
-                mv.visitLdcInsn("[DualAuth] Dynamic Config: F2P_URL=");
-                mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(Ljava/lang/String;)V",
-                                false);
+                mv.visitLdcInsn("[DualAuth] Config: F2P_URL=");
+                mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(Ljava/lang/String;)V", false);
                 mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "F2P_URL", "Ljava/lang/String;");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
                 mv.visitLdcInsn(", BASE_DOMAIN=");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
                 mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "F2P_BASE_DOMAIN", "Ljava/lang/String;");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-                mv.visitLdcInsn(", OFF_DOMAIN=");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_DOMAIN", "Ljava/lang/String;");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append",
-                                "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;",
-                                false);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V",
-                                false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
 
                 mv.visitInsn(Opcodes.RETURN);
-                mv.visitMaxs(4, 5);
+                mv.visitMaxs(4, 6);
                 mv.visitEnd();
 
                 // Private constructor
@@ -3610,7 +3585,7 @@ public class DualAuthPatcher {
                 cw.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "issuerIdentityCache",
                                 "Ljava/util/concurrent/ConcurrentHashMap;", null, null).visitEnd();
 
-                // --- MERGED STATIC INITIALIZER (<clinit>) ---
+                // --- STATIC INITIALIZER (<clinit>) ---
                 mv = cw.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
                 mv.visitCode();
 
@@ -3635,7 +3610,11 @@ public class DualAuthPatcher {
                 mv.visitFieldInsn(Opcodes.PUTSTATIC, TOKEN_MANAGER_CLASS, "issuerIdentityCache",
                                 "Ljava/util/concurrent/ConcurrentHashMap;");
 
-                // 3. Perform Synchronous Fetch
+                // 3. WARM UP JWKS (Issue 1)
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, JWKS_FETCHER_CLASS, "fetchMergedJwksJson", "()Ljava/lang/String;", false);
+                mv.visitInsn(Opcodes.POP);
+
+                // 4. Perform Synchronous Fetch
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, TOKEN_MANAGER_CLASS, "ensureF2PTokens", "()V", false);
 
                 mv.visitInsn(Opcodes.RETURN);
@@ -3965,11 +3944,8 @@ public class DualAuthPatcher {
                 mv.visitMaxs(3, 5);
                 mv.visitEnd();
 
-                // ==========================================================================================
-                // AGNOSTIC IMPLEMENTATION: getSessionTokenForIssuer
-                // ==========================================================================================
-                mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
-                                "getSessionTokenForIssuer", "(Ljava/lang/String;)Ljava/lang/String;", null, null);
+                // === CRITICAL FIX: getSessionTokenForIssuer ===
+                mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "getSessionTokenForIssuer", "(Ljava/lang/String;)Ljava/lang/String;", null, null);
                 mv.visitCode();
 
                 // 1. Resolve Issuer
@@ -3980,76 +3956,40 @@ public class DualAuthPatcher {
                 mv.visitVarInsn(Opcodes.ASTORE, 0);
                 mv.visitLabel(stHasIssuer);
 
-                // 2. Safeguard
+                // 2. Safeguard (null check)
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 Label stCheckOff = new Label();
                 mv.visitJumpInsn(Opcodes.IFNONNULL, stCheckOff);
+                // If issuer is null, assume F2P fallback
                 mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "f2pSessionToken", "Ljava/lang/String;");
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(stCheckOff);
 
                 // 3. Official Check
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_DOMAIN", "Ljava/lang/String;");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains",
-                                "(Ljava/lang/CharSequence;)Z", false);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, HELPER_CLASS, "isOfficialIssuer", "(Ljava/lang/String;)Z", false);
                 Label stNotOff = new Label();
                 mv.visitJumpInsn(Opcodes.IFEQ, stNotOff);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "officialSessionToken",
-                                "Ljava/lang/String;");
+                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "officialSessionToken", "Ljava/lang/String;");
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(stNotOff);
 
-                // 4. F2P Check
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "F2P_BASE_DOMAIN", "Ljava/lang/String;");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains",
-                                "(Ljava/lang/CharSequence;)Z", false);
+                // 4. F2P Check (PROMISCUOUS MODE)
+                // If we have F2P tokens, and the user didn't ask for official, return F2P token.
+                // This solves the localhost (server) vs sanasol.ws (client) mismatch.
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TOKEN_MANAGER_CLASS, "hasF2PTokens", "()Z", false);
                 Label stCheckOmni = new Label();
                 mv.visitJumpInsn(Opcodes.IFEQ, stCheckOmni);
+                
+                // Log Promiscuous fallback
+                mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+                mv.visitLdcInsn("[DualAuth] Returning F2P token for non-official issuer: ");
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "print", "(Ljava/lang/String;)V", false);
+                mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
 
-                // F2P Logic: Check for exact issuer match
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "f2pIssuer", "Ljava/lang/String;");
-                mv.visitVarInsn(Opcodes.ASTORE, 1);
-                mv.visitVarInsn(Opcodes.ALOAD, 1);
-                Label stCheckDynamic = new Label();
-                mv.visitJumpInsn(Opcodes.IFNULL, stCheckDynamic);
-                mv.visitVarInsn(Opcodes.ALOAD, 1);
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
-                mv.visitJumpInsn(Opcodes.IFEQ, stCheckDynamic);
                 mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "f2pSessionToken", "Ljava/lang/String;");
-                mv.visitInsn(Opcodes.ARETURN);
-
-                mv.visitLabel(stCheckDynamic);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "issuerTokenCache",
-                                "Ljava/util/concurrent/ConcurrentHashMap;");
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/concurrent/ConcurrentHashMap", "get",
-                                "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String");
-                mv.visitVarInsn(Opcodes.ASTORE, 2);
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
-                Label stHasCached = new Label();
-                mv.visitJumpInsn(Opcodes.IFNONNULL, stHasCached);
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TOKEN_MANAGER_CLASS, "fetchAndCacheServerTokens",
-                                "(Ljava/lang/String;)V", false);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "issuerTokenCache",
-                                "Ljava/util/concurrent/ConcurrentHashMap;");
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/concurrent/ConcurrentHashMap", "get",
-                                "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String");
-                mv.visitVarInsn(Opcodes.ASTORE, 2);
-                mv.visitLabel(stHasCached);
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
-                Label stReturnDyn = new Label();
-                mv.visitJumpInsn(Opcodes.IFNONNULL, stReturnDyn);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "f2pSessionToken", "Ljava/lang/String;");
-                mv.visitInsn(Opcodes.ARETURN);
-                mv.visitLabel(stReturnDyn);
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(stCheckOmni);
@@ -4072,6 +4012,9 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ACONST_NULL);
                 mv.visitInsn(Opcodes.ARETURN);
 
+                mv.visitMaxs(2, 1);
+                mv.visitEnd();
+
                 mv.visitMaxs(3, 3);
                 mv.visitEnd();
 
@@ -4093,14 +4036,10 @@ public class DualAuthPatcher {
         mv.visitEnd();
 
 
-                // ==========================================================================================
-                // AGNOSTIC IMPLEMENTATION: getIdentityTokenForIssuer
-                // ==========================================================================================
-                mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
-                                "getIdentityTokenForIssuer", "(Ljava/lang/String;)Ljava/lang/String;", null, null);
+                // === CRITICAL FIX: getIdentityTokenForIssuer (Same logic) ===
+                mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "getIdentityTokenForIssuer", "(Ljava/lang/String;)Ljava/lang/String;", null, null);
                 mv.visitCode();
 
-                // 1. Resolve Issuer
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 Label idHasIssuer = new Label();
                 mv.visitJumpInsn(Opcodes.IFNONNULL, idHasIssuer);
@@ -4108,7 +4047,6 @@ public class DualAuthPatcher {
                 mv.visitVarInsn(Opcodes.ASTORE, 0);
                 mv.visitLabel(idHasIssuer);
 
-                // 2. Safeguard
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
                 Label idCheckOff = new Label();
                 mv.visitJumpInsn(Opcodes.IFNONNULL, idCheckOff);
@@ -4116,89 +4054,36 @@ public class DualAuthPatcher {
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(idCheckOff);
 
-                // 3. Official Check
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "OFFICIAL_DOMAIN", "Ljava/lang/String;");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains",
-                                "(Ljava/lang/CharSequence;)Z", false);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, HELPER_CLASS, "isOfficialIssuer", "(Ljava/lang/String;)Z", false);
                 Label idNotOff = new Label();
                 mv.visitJumpInsn(Opcodes.IFEQ, idNotOff);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "officialIdentityToken",
-                                "Ljava/lang/String;");
+                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "officialIdentityToken", "Ljava/lang/String;");
                 mv.visitInsn(Opcodes.ARETURN);
                 mv.visitLabel(idNotOff);
 
-                // 4. F2P Check
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, HELPER_CLASS, "F2P_BASE_DOMAIN", "Ljava/lang/String;");
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "contains",
-                                "(Ljava/lang/CharSequence;)Z", false);
+                // Promiscuous F2P Fallback
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TOKEN_MANAGER_CLASS, "hasF2PTokens", "()Z", false);
                 Label idCheckOmni = new Label();
                 mv.visitJumpInsn(Opcodes.IFEQ, idCheckOmni);
-
-                // F2P Logic: Check match or cache
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "f2pIssuer", "Ljava/lang/String;");
-                mv.visitVarInsn(Opcodes.ASTORE, 1);
-                mv.visitVarInsn(Opcodes.ALOAD, 1);
-                Label idCheckDynamic = new Label();
-                mv.visitJumpInsn(Opcodes.IFNULL, idCheckDynamic);
-                mv.visitVarInsn(Opcodes.ALOAD, 1);
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
-                mv.visitJumpInsn(Opcodes.IFEQ, idCheckDynamic);
                 mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "f2pIdentityToken", "Ljava/lang/String;");
-                mv.visitInsn(Opcodes.ARETURN);
-
-                mv.visitLabel(idCheckDynamic);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "issuerIdentityCache",
-                                "Ljava/util/concurrent/ConcurrentHashMap;");
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/concurrent/ConcurrentHashMap", "get",
-                                "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String");
-                mv.visitVarInsn(Opcodes.ASTORE, 2);
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
-                Label idHasCached = new Label();
-                mv.visitJumpInsn(Opcodes.IFNONNULL, idHasCached);
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TOKEN_MANAGER_CLASS, "fetchAndCacheServerTokens",
-                                "(Ljava/lang/String;)V", false);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "issuerIdentityCache",
-                                "Ljava/util/concurrent/ConcurrentHashMap;");
-                mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/concurrent/ConcurrentHashMap", "get",
-                                "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/String");
-                mv.visitVarInsn(Opcodes.ASTORE, 2);
-                mv.visitLabel(idHasCached);
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
-                Label idReturnDyn = new Label();
-                mv.visitJumpInsn(Opcodes.IFNONNULL, idReturnDyn);
-                mv.visitFieldInsn(Opcodes.GETSTATIC, TOKEN_MANAGER_CLASS, "f2pIdentityToken", "Ljava/lang/String;");
-                mv.visitInsn(Opcodes.ARETURN);
-                mv.visitLabel(idReturnDyn);
-                mv.visitVarInsn(Opcodes.ALOAD, 2);
                 mv.visitInsn(Opcodes.ARETURN);
 
                 mv.visitLabel(idCheckOmni);
 
-                // 5. Omni Check (Modified: Try dynamic generation if not found in cache/fetch)
                 mv.visitMethodInsn(Opcodes.INVOKESTATIC, CONTEXT_CLASS, "getJwk", "()Ljava/lang/String;", false);
                 Label idNoJwk = new Label();
                 mv.visitJumpInsn(Opcodes.IFNULL, idNoJwk);
-
-                // We have a JWK context (meaning a client is connected).
-                // If we haven't returned yet, generate a dynamic token signed by client's key.
                 mv.visitVarInsn(Opcodes.ALOAD, 0);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TOKEN_MANAGER_CLASS, "generateDynamicIdentityToken",
-                                "(Ljava/lang/String;)Ljava/lang/String;", false);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TOKEN_MANAGER_CLASS, "generateDynamicIdentityToken", "(Ljava/lang/String;)Ljava/lang/String;", false);
                 mv.visitInsn(Opcodes.ARETURN);
-
+                
                 mv.visitLabel(idNoJwk);
-
-                // Fallback (Return null to avoid incorrect issuer errors)
                 mv.visitInsn(Opcodes.ACONST_NULL);
                 mv.visitInsn(Opcodes.ARETURN);
+
+                mv.visitMaxs(2, 1);
+                mv.visitEnd();
 
                 mv.visitMaxs(3, 3);
                 mv.visitEnd();
