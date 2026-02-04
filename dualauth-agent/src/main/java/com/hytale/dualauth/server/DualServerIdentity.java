@@ -31,7 +31,7 @@ public class DualServerIdentity {
 
     public static void refreshF2PTokens() {
         try {
-            String endpoint = DualAuthConfig.F2P_SESSION_URL + "/server/identity";
+            String endpoint = DualAuthConfig.F2P_SESSION_URL + "/server/auto-auth";
             LOGGER.info("[DualAuth] Fetching F2P identity token from: " + endpoint);
             String response = fetchUrl(endpoint);
             if (response == null || response.isEmpty()) {
@@ -42,7 +42,15 @@ public class DualServerIdentity {
             if (identityToken == null) identityToken = extractJsonField(response, "token");
             if (identityToken != null) {
                 DualServerTokenManager.setF2PTokens(sessionToken, identityToken);
-                LOGGER.info("[DualAuth] F2P tokens fetched successfully");
+                
+                // Capture optional metadata from Sanasol backend
+                String sUuid = extractJsonField(response, "serverUuid");
+                if (sUuid != null) DualAuthHelper.setServerUuid(sUuid);
+                
+                String sId = extractJsonField(response, "serverId");
+                if (sId != null) DualAuthHelper.setServerId(sId);
+
+                LOGGER.info("[DualAuth] F2P tokens fetched successfully (UUID: " + DualAuthHelper.getServerUuid() + ", ID: " + DualAuthHelper.getServerId() + ")");
             } else generateFallbackTokens();
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "[DualAuth] Failed to fetch F2P tokens: " + e.getMessage());
@@ -54,7 +62,7 @@ public class DualServerIdentity {
         try {
             OctetKeyPair keyPair = getOrCreateSelfSignedKeyPair();
             String issuer = DualAuthConfig.F2P_ISSUER;
-            String serverUuid = getServerUuid();
+            String serverUuid = DualAuthHelper.getServerUuid();
             Date now = new Date();
             Date exp = new Date(now.getTime() + 3600_000L); 
             
@@ -85,10 +93,6 @@ public class DualServerIdentity {
         return selfSignedKeyPair;
     }
 
-    private static String getServerUuid() {
-        String env = System.getenv("HYTALE_SERVER_AUDIENCE");
-        return (env != null && !env.isEmpty()) ? env : UUID.randomUUID().toString();
-    }
 
     public static String createDynamicIdentityToken(String issuer, String playerUuid) {
         if (issuer == null) issuer = DualAuthContext.getIssuer();
@@ -110,14 +114,14 @@ public class DualServerIdentity {
 
             JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .issuer(issuer)
-                .subject(getServerUuid())
+                .subject(DualAuthHelper.getServerUuid())
                 .audience(aud) // CRITICAL: Audience must be the Player's UUID
                 .issueTime(new Date())
                 .expirationTime(new Date(System.currentTimeMillis() + 3600000L))
                 .claim("scope", "hytale:server")
                 .build();
 
-            String header = Base64URL.encode("{\"alg\":\"EdDSA\",\"typ\":\"JWT\",\"jwk\":" + kp.toPublicJWK().toJSONString() + "}").toString();
+            String header = Base64URL.encode("{\"alg\":\"EdDSA\",\"typ\":\"JWT\",\"kid\":\"" + kp.getKeyID() + "\",\"jwk\":" + kp.toPublicJWK().toJSONString() + "}").toString();
             String payload = Base64URL.encode(claims.toJSONObject().toString()).toString();
             
             return signNative(header + "." + payload, kp);

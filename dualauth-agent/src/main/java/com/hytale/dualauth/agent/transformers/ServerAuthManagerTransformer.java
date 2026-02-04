@@ -81,7 +81,7 @@ public class ServerAuthManagerTransformer implements net.bytebuddy.agent.builder
             try {
                 if (returnedValue == null || returnedValue.isEmpty()) {
                     String issuer = DualAuthContext.getIssuer();
-                    String fallback = DualServerTokenManager.getIdentityTokenForIssuer(issuer);
+                    String fallback = DualServerTokenManager.getIdentityTokenForIssuer(issuer, DualAuthContext.getPlayerUuid());
                     if (fallback != null && !fallback.isEmpty()) {
                         returnedValue = fallback;
                     }

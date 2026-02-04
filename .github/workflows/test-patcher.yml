@@ -54,7 +54,7 @@ jobs:
         working-directory: dualauth-agent
         run: |
           chmod +x ./gradlew
-          ./gradlew clean shadowJar
+          ./gradlew clean shadowJar --stacktrace --info
           ls -la build/libs/*.jar
 
       - name: Extract version

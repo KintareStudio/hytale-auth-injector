@@ -232,19 +232,28 @@ public class DualAuthHelper {
     }
 
     public static void updateExpectedIssuer(Object validator, String issuer) {
-        if (validator == null || issuer == null) return;
+        if (validator == null) return;
         try {
             Class<?> clazz = validator.getClass();
             while (clazz != null && clazz != Object.class) {
                 for (Field f : clazz.getDeclaredFields()) {
                     String name = f.getName().toLowerCase();
-                    if (name.contains("expectedissuer") || name.equals("issuer")) {
+                    // Update Issuer
+                    if (issuer != null && (name.contains("expectedissuer") || name.equals("issuer"))) {
                         f.setAccessible(true);
                         f.set(validator, issuer);
                         if (Boolean.getBoolean("dualauth.debug")) {
                             System.out.println("[DualAuth] Updated expectedIssuer to: " + issuer + " in " + clazz.getSimpleName());
                         }
-                        return;
+                    }
+                    // Update Audience
+                    String sId = getServerId();
+                    if (sId != null && (name.contains("expectedaudience") || name.equals("audience"))) {
+                        f.setAccessible(true);
+                        f.set(validator, sId);
+                        if (Boolean.getBoolean("dualauth.debug")) {
+                            System.out.println("[DualAuth] Updated expectedAudience to: " + sId + " in " + clazz.getSimpleName());
+                        }
                     }
                 }
                 clazz = clazz.getSuperclass();
@@ -352,6 +361,24 @@ public class DualAuthHelper {
         if (env == null || env.isEmpty()) env = System.getenv("HYTALE_SERVER_ID");
         cachedServerUuid = (env != null && !env.isEmpty()) ? env : "00000000-0000-0000-0000-000000000001";
         return cachedServerUuid;
+    }
+
+    public static void setServerUuid(String uuid) {
+        if (uuid != null && !uuid.isEmpty()) {
+            cachedServerUuid = uuid;
+        }
+    }
+
+    private static String cachedServerId = null;
+    public static String getServerId() {
+        if (cachedServerId != null) return cachedServerId;
+        return getServerUuid(); // Fallback to UUID
+    }
+
+    public static void setServerId(String id) {
+        if (id != null && !id.isEmpty()) {
+            cachedServerId = id;
+        }
     }
 
     public static String extractUsername(Object handler) {

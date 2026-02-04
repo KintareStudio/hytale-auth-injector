@@ -61,7 +61,7 @@ public class DualAuthAgent {
         System.setProperty("net.bytebuddy.experimental", "true");
         
         System.out.println("╔══════════════════════════════════════════════════════════════╗");
-        System.out.println("║           DualAuth ByteBuddy Agent v" + padRight(VERSION, 24) + "║");
+        System.out.println("║            DualAuth ByteBuddy Agent v" + padRight(VERSION, 24) + "║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
         System.out.println("║ Configuration:                                               ║");
         System.out.println("║   F2P Domain: " + padRight(DualAuthConfig.F2P_DOMAIN, 47) + "║");
