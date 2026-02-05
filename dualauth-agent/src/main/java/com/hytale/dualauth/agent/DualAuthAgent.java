@@ -1,6 +1,7 @@
 package com.hytale.dualauth.agent;
 
 import com.hytale.dualauth.agent.transformers.*;
+import com.hytale.dualauth.agent.transformers.LoggingTransformer;
 import net.bytebuddy.agent.builder.AgentBuilder;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.DynamicType;
@@ -116,6 +117,10 @@ public class DualAuthAgent {
             // 5. Manager Logic (Native Token Capture)
             .type(named("com.hypixel.hytale.server.core.auth.ServerAuthManager"))
             .transform(new ServerAuthManagerTransformer())
+            
+            // 6. Logging Enhancement (Complete replacement of logging system)
+            .type(named("com.hypixel.hytale.logger.backend.HytaleLogFormatter"))
+            .transform(new LoggingTransformer())
             
             .installOn(inst);
             

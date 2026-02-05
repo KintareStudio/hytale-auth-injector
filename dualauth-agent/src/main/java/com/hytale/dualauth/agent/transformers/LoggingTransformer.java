@@ -1,0 +1,153 @@
+package com.hytale.dualauth.agent.transformers;
+
+import net.bytebuddy.asm.Advice;
+import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.dynamic.DynamicType;
+
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.logging.LogRecord;
+
+import static net.bytebuddy.matcher.ElementMatchers.*;
+
+/**
+ * Transformer for replacing completely the logging system of Hytale
+ * Intercepts the format method of HytaleLogFormatter to provide a new logging
+ * system
+ * This approach completely replaces the original formatter
+ */
+public class LoggingTransformer implements net.bytebuddy.agent.builder.AgentBuilder.Transformer {
+
+    public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    public static final boolean LOGGING_ENABLED = !"false".equalsIgnoreCase(System.getenv("DUALAUTH_LOGGING_ENABLED"));
+
+    @Override
+    public DynamicType.Builder<?> transform(DynamicType.Builder<?> builder, TypeDescription typeDescription,
+            ClassLoader classLoader, net.bytebuddy.utility.JavaModule module, java.security.ProtectionDomain pd) {
+        if (!LOGGING_ENABLED) {
+            System.out.println(
+                    "[DualAuth] LoggingTransformer: Disabled by environment variable DUALAUTH_LOGGING_ENABLED=false");
+            return builder; // Don't apply transformation if disabled
+        }
+
+        System.out.println("[DualAuth] LoggingTransformer: Transforming " + typeDescription.getName());
+
+        return builder
+                .visit(Advice.to(LoggingAdvice.class).on(
+                        named("format")
+                                .and(takesArguments(1))
+                                .and(takesArgument(0, LogRecord.class))
+                                .and(isMethod())
+                                .and(not(isStatic()))));
+    }
+
+    /**
+     * Advice to intercept completely the logging system
+     */
+    public static class LoggingAdvice {
+
+        @Advice.OnMethodEnter
+        public static void enter(@Advice.Argument(0) LogRecord record,
+                @Advice.Local("loggerName") String loggerName,
+                @Advice.Local("originalMessage") String originalMessage,
+                @Advice.Local("level") String level,
+                @Advice.Local("formattedOutput") String formattedOutput) {
+            if (!LoggingTransformer.LOGGING_ENABLED) {
+                return; // Don't do anything if disabled
+            }
+
+            try {
+                // Get the log record information
+                originalMessage = record.getMessage();
+                level = record.getLevel().getName();
+                loggerName = record.getLoggerName() != null ? record.getLoggerName() : "Unknown";
+
+                // Get the current time in HH:mm format
+                String time = LocalTime.now().format(TIME_FORMATTER);
+
+                // Determine color and format based on the content of the message
+                String message = originalMessage != null ? originalMessage : "";
+                String lowerMessage = message.toLowerCase();
+
+                // Check if the message is related to DualAuth
+                boolean isDualAuthMessage = lowerMessage.contains("dualauth") || lowerMessage.contains("auth") ||
+                        lowerMessage.contains("token") || lowerMessage.contains("issuer") ||
+                        lowerMessage.contains("session") || lowerMessage.contains("jwt");
+
+                // Determine color based on if it is a DualAuth message
+                String colorCode = isDualAuthMessage ? "\033[95m" : getColorCodeForLevel(level, false);
+                String resetCode = "\033[m";
+
+                // Format the message with a special prefix if it is a DualAuth message
+                if (isDualAuthMessage) {
+                    formattedOutput = String.format("%s[%s] (%s)%s %s[🔒 DUALAUTH] %s%s",
+                            colorCode,
+                            time,
+                            loggerName,
+                            resetCode,
+                            colorCode,
+                            message,
+                            resetCode);
+                } else {
+                    formattedOutput = String.format("%s[%s] (%s)%s %s",
+                            colorCode,
+                            time,
+                            loggerName,
+                            resetCode,
+                            message);
+                }
+
+            } catch (Exception e) {
+                System.err.println("Error in LoggingAdvice enter: " + e.getMessage());
+            }
+        }
+
+        @Advice.OnMethodExit(onThrowable = Throwable.class)
+        public static void exit(@Advice.Return(readOnly = false) String returnedValue,
+                @Advice.Local("formattedOutput") String formattedOutput) {
+            if (!LoggingTransformer.LOGGING_ENABLED) {
+                return; // Don't do anything if disabled
+            }
+
+            try {
+                // Override the return value of the original method with our format
+                // This completely replaces the original formatter result
+                if (formattedOutput != null) {
+                    returnedValue = formattedOutput + "\n"; // Add newline like the original
+                } else {
+                    // If something fails, return an empty string to avoid the original format
+                    returnedValue = "\n"; // Return at least a newline to maintain format
+                }
+            } catch (Exception e) {
+                System.err.println("Error in LoggingAdvice exit: " + e.getMessage());
+                returnedValue = "";
+            }
+        }
+
+        public static String getColorCodeForLevel(String level, boolean isDualAuthMessage) {
+            if (level == null) {
+                return "\033[97m"; // Default to white
+            }
+
+            switch (level.toUpperCase()) {
+                case "SEVERE":
+                case "ERROR":
+                    return "\033[91m"; // Red
+                case "WARNING":
+                case "WARN":
+                    return "\033[93m"; // Yellow
+                case "INFO":
+                    return "\033[92m"; // Green
+                case "DEBUG":
+                case "FINE":
+                case "FINER":
+                case "FINEST":
+                    return "\033[96m"; // Cyan
+                case "CONFIG":
+                    return "\033[95m"; // Magenta
+                default:
+                    return "\033[97m"; // White
+            }
+        }
+    }
+}
