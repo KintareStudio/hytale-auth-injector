@@ -287,7 +287,7 @@ public class DualServerIdentity {
                 }
                 
                 // 7. Cache the result
-                CachedServerTokens newCached = new CachedServerTokens(identityToken, sessionToken, "federated", SERVER_TOKEN_TTL);
+                CachedServerTokens newCached = new CachedServerTokens(identityToken, sessionToken, "federated");
                 serverTokenCache.put(issuer, newCached);
                 
                 if (Boolean.getBoolean("dualauth.debug")) {
