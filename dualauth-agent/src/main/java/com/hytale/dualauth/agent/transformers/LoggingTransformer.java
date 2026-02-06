@@ -60,12 +60,27 @@ public class LoggingTransformer implements net.bytebuddy.agent.builder.AgentBuil
                 // Get the current time in HH:mm format
                 String time = LocalTime.now().format(TIME_FORMATTER);
 
-                // Use standard color based on log level (no special DualAuth coloring)
-                String colorCode = getColorCodeForLevel(level, false);
-                String resetCode = "\033[m";
+                // Auto-detect if output is to file vs terminal
+                boolean isFileHandler = false;
+                StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+                for (StackTraceElement element : stack) {
+                    String className = element.getClassName();
+                    if (className.contains("FileHandler") || className.contains("FileLogHandler") || 
+                        className.contains("FileAppender") || className.contains("RollingFileHandler")) {
+                        isFileHandler = true;
+                        break;
+                    }
+                }
+                
+                // Use colors only for terminal output (not file handlers)
+                boolean useColors = !isFileHandler && System.console() != null;
+                
+                // Use color codes only when appropriate
+                String colorCode = useColors ? getColorCodeForLevel(level, false) : "";
+                String resetCode = useColors ? "\033[m" : "";
 
-                // Format the message with standard colors
-                formattedOutput = String.format("%s[%s] (%s)%s %s",
+                // Format the message (with colors only for terminal)
+                formattedOutput = String.format("%s[%s] %s%s | %s",
                         colorCode,
                         time,
                         loggerName,
