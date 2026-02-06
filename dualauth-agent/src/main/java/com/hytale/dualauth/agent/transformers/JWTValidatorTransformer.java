@@ -22,7 +22,7 @@ public class JWTValidatorTransformer implements net.bytebuddy.agent.builder.Agen
 
     @Override
     public DynamicType.Builder<?> transform(DynamicType.Builder<?> builder, TypeDescription typeDescription, ClassLoader classLoader, net.bytebuddy.utility.JavaModule module, java.security.ProtectionDomain pd) {
-        System.out.println("[DualAuth] JWTValidatorTransformer: Transforming " + typeDescription.getName());
+        System.out.println("[DualAuthAgent] JWTValidatorTransformer: Transforming " + typeDescription.getName());
         
         return builder
             .visit(Advice.to(ValidateAdvice.class).on(
@@ -63,7 +63,7 @@ public class JWTValidatorTransformer implements net.bytebuddy.agent.builder.Agen
                     DualAuthContext.softClear();
                     
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] ValidateAdvice: Processing official issuer with clean context: " + issuer);
+                        System.out.println("[DualAuthAgent] ValidateAdvice: Processing official issuer with clean context: " + issuer);
                     }
                     
                     // Continue to original validation for official issuers
@@ -89,10 +89,10 @@ public class JWTValidatorTransformer implements net.bytebuddy.agent.builder.Agen
 
                          Object wrapper = DualAuthHelper.verifyTrustedToken(thiz, token, methodName);
                          if (wrapper != null) {
-                             System.out.println("[DualAuth] Manual validation SUCCESS for issuer: " + issuer);
+                             System.out.println("[DualAuthAgent] Manual validation SUCCESS for issuer: " + issuer);
                              return wrapper;
                          } else {
-                             System.out.println("[DualAuth] Manual validation FAILED for issuer: " + issuer + " (falling back)");
+                             System.out.println("[DualAuthAgent] Manual validation FAILED for issuer: " + issuer + " (falling back)");
                          }
                     }
                     
@@ -126,7 +126,7 @@ public class JWTValidatorTransformer implements net.bytebuddy.agent.builder.Agen
                 String currentIssuer = DualAuthContext.getIssuer();
                 if (currentIssuer != null && DualAuthHelper.isOfficialIssuer(currentIssuer)) {
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] FetchJwksAdvice: Using original JWKS flow for official issuer: " + currentIssuer);
+                        System.out.println("[DualAuthAgent] FetchJwksAdvice: Using original JWKS flow for official issuer: " + currentIssuer);
                     }
                     return null; // Let original flow handle official issuers
                 }
@@ -177,10 +177,10 @@ public class JWTValidatorTransformer implements net.bytebuddy.agent.builder.Agen
                 // Use public helper to update timestamp
                 DualAuthHelper.updateCacheTimestamp(thiz);
 
-                System.out.println("[DualAuth] fetchJwksFromService: Successfully loaded " + jwkList.size() + " merged keys.");
+                System.out.println("[DualAuthAgent] fetchJwksFromService: Successfully loaded " + jwkList.size() + " merged keys.");
                 return jwkSet;
             } catch (Exception e) {
-                System.out.println("[DualAuth] fetchJwksFromService failed: " + e.getMessage());
+                System.err.println("[DualAuthAgent] fetchJwksFromService failed: " + e.getMessage());
                 return null;
             }
         }
@@ -214,14 +214,14 @@ public class JWTValidatorTransformer implements net.bytebuddy.agent.builder.Agen
                     
                     if (isManualInvalidation || isForcedRefresh) {
                         if (Boolean.getBoolean("dualauth.debug")) {
-                            System.out.println("[DualAuth] CacheProtection: Allowing " + methodName + " for official issuer: " + currentIssuer);
+                            System.out.println("[DualAuthAgent] CacheProtection: Allowing " + methodName + " for official issuer: " + currentIssuer);
                         }
                         return false; // Allow manual/forced invalidation
                     }
                     
                     // Only block automatic background refreshes for official issuers
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] CacheProtection: Blocking automatic cache invalidation for official issuer: " + currentIssuer + " (method: " + methodName + ")");
+                        System.out.println("[DualAuthAgent] CacheProtection: Blocking automatic cache invalidation for official issuer: " + currentIssuer + " (method: " + methodName + ")");
                     }
                     return true; // Skip automatic cache invalidation for officials
                 }

@@ -17,7 +17,7 @@ public class HandshakeHandlerTransformer implements net.bytebuddy.agent.builder.
     
     @Override
     public DynamicType.Builder<?> transform(DynamicType.Builder<?> builder, TypeDescription typeDescription, ClassLoader classLoader, net.bytebuddy.utility.JavaModule module, java.security.ProtectionDomain pd) {
-        System.out.println("[DualAuth] HandshakeHandlerTransformer: Transforming " + typeDescription.getName());
+        System.out.println("[DualAuthAgent] HandshakeHandlerTransformer: Transforming " + typeDescription.getName());
         
         return builder
             .visit(Advice.to(HandshakeEntryAdvice.class).on(
@@ -49,12 +49,12 @@ public class HandshakeHandlerTransformer implements net.bytebuddy.agent.builder.
                 }
             } catch (Exception e) {
                 // Log error but don't crash the handshake
-                System.out.println("[DualAuth] HandshakeEntryAdvice error: " + e.getMessage());
+                System.out.println("[DualAuthAgent] HandshakeEntryAdvice error: " + e.getMessage());
                 // Ensure context is reset even on error
                 try {
                     DualAuthContext.resetForNewConnection();
                 } catch (Exception resetError) {
-                    System.out.println("[DualAuth] Failed to reset context after error: " + resetError.getMessage());
+                    System.out.println("[DualAuthAgent] Failed to reset context after error: " + resetError.getMessage());
                 }
             }
         }
@@ -73,12 +73,12 @@ public class HandshakeHandlerTransformer implements net.bytebuddy.agent.builder.
                     if (handshakeUser != null && !handshakeUser.trim().isEmpty()) {
                         String cleanUsername = handshakeUser.trim();
                         DualAuthHelper.setF(thiz, "authenticatedUsername", cleanUsername);
-                        System.out.println("[DualAuth] HandshakeHandler: Fallback to handshake username: " + cleanUsername);
+                        System.out.println("[DualAuthAgent] HandshakeHandler: Fallback to handshake username: " + cleanUsername);
                     }
                 }
             } catch (Exception e) {
                 // Log error but don't crash the authentication
-                System.out.println("[DualAuth] UsernameFallbackAdvice error: " + e.getMessage());
+                System.out.println("[DualAuthAgent] UsernameFallbackAdvice error: " + e.getMessage());
             }
         }
     }

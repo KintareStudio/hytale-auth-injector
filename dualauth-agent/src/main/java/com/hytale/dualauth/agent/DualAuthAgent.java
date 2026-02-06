@@ -41,6 +41,7 @@ public class DualAuthAgent {
 
     public static void main(String[] args) {
         if (args.length > 0 && (args[0].equals("--version") || args[0].equals("-v"))) {
+            // Use System.out for version to avoid logger initialization issues
             System.out.println("DualAuth Agent version: " + VERSION);
         } else {
             System.out.println("DualAuth Agent v" + VERSION);
@@ -52,6 +53,7 @@ public class DualAuthAgent {
     public static void premain(String args, Instrumentation inst) {
         // Handle --version in agent arguments
         if (args != null && (args.contains("version") || args.contains("-v"))) {
+            // Use System.out for version to avoid logger conflicts with Hytale
             System.out.println("DualAuth Agent version: " + VERSION);
             if (args.equals("version") || args.equals("--version") || args.equals("-v")) {
                 return; // Exit premain if only version was requested
@@ -61,6 +63,7 @@ public class DualAuthAgent {
         // Enable experimental mode for newer Java versions
         System.setProperty("net.bytebuddy.experimental", "true");
         
+        // Use System.out for startup messages to avoid Hytale logging conflicts
         System.out.println("╔══════════════════════════════════════════════════════════════╗");
         System.out.println("║            DualAuth ByteBuddy Agent v" + padRight(VERSION, 24) + "║");
         System.out.println("╠══════════════════════════════════════════════════════════════╣");
@@ -83,12 +86,12 @@ public class DualAuthAgent {
                 @Override
                 public void onTransformation(TypeDescription typeDescription, ClassLoader classLoader,
                         JavaModule module, boolean loaded, DynamicType dynamicType) {
-                    System.out.println("[DualAuth] ✓ TRANSFORMED: " + typeDescription.getName());
+                    System.out.println("✓ TRANSFORMED: " + typeDescription.getName());
                 }
 
                 @Override
                 public void onError(String typeName, ClassLoader classLoader, JavaModule module, boolean loaded, Throwable throwable) {
-                    System.err.println("[DualAuth] ✗ ERROR transforming " + typeName + ": " + throwable.getMessage());
+                    System.err.println("✗ ERROR transforming " + typeName + ": " + throwable.getMessage());
                     throwable.printStackTrace();
                 }
             })
@@ -124,8 +127,8 @@ public class DualAuthAgent {
             
             .installOn(inst);
             
-        System.out.println("[DualAuth] ByteBuddy Agent Installed Successfully.");
-        System.out.println("[DualAuth] Waiting for Hytale Server classes to load...");
+        System.out.println("ByteBuddy Agent Installed Successfully.");
+        System.out.println("Waiting for Hytale Server classes to load...");
     }
 
     private static String padRight(String s, int length) {

@@ -49,11 +49,11 @@ public class DualJwksFetcher {
                 if (!content.isEmpty()) {
                     dynamicIssuerCache.put(issuer, content);
                     finalAggregatedJson = null; // Invalidate cache
-                    LOGGER.info("[DualAuth] Discovered new key source: " + jwksUrl);
+                    LOGGER.info("Discovered new key source: " + jwksUrl);
                 }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "[DualAuth] Failed discovery for issuer: " + issuer, e);
+            LOGGER.log(Level.WARNING, "Failed discovery for issuer: " + issuer, e);
         }
     }
 
@@ -95,7 +95,7 @@ public class DualJwksFetcher {
         if (omniJwk != null && !omniJwk.isEmpty()) {
             if (!first) sb.append(",");
             sb.append(omniJwk);
-            System.out.println("[DualAuth] Including current Omni-Auth key in JWKS");
+            LOGGER.info("Including current Omni-Auth key in JWKS");
             first = false;
         }
 
@@ -104,28 +104,28 @@ public class DualJwksFetcher {
         
         // Log summary of what we merged
         int keyCount = countOccurrences(finalAggregatedJson, "kid") / 2;
-        System.out.println("[DualAuth] fetchMergedJwksJson: Created merged set with multiple keys (estimated " + keyCount + " kids).");
+        LOGGER.info("fetchMergedJwksJson: Created merged set with multiple keys (estimated " + keyCount + " kids).");
         
         return finalAggregatedJson;
     }
 
     private static void updateBaseKeys() {
-        System.out.println("[DualAuth] Refreshing base JWKS from Official and F2P backends...");
-        System.out.println("[DualAuth] Official URL: " + OFFICIAL_JWKS_URL);
-        System.out.println("[DualAuth] F2P URL: " + F2P_JWKS_URL);
+        LOGGER.info("Refreshing base JWKS from Official and F2P backends...");
+        LOGGER.info("Official URL: " + OFFICIAL_JWKS_URL);
+        LOGGER.info("F2P URL: " + F2P_JWKS_URL);
         
         String officialJson = fetchJwksJson(OFFICIAL_JWKS_URL);
         if (officialJson != null) {
-            System.out.println("[DualAuth] Successfully fetched Official JWKS.");
+            LOGGER.info("Successfully fetched Official JWKS.");
         } else {
-            System.out.println("[DualAuth] WARNING: Failed to fetch Official JWKS.");
+            LOGGER.warning("Failed to fetch Official JWKS.");
         }
 
         String f2pJson = fetchJwksJson(F2P_JWKS_URL);
         if (f2pJson != null) {
-            System.out.println("[DualAuth] Successfully fetched F2P JWKS.");
+            LOGGER.info("Successfully fetched F2P JWKS.");
         } else {
-            System.out.println("[DualAuth] WARNING: Failed to fetch F2P JWKS from " + F2P_JWKS_URL);
+            LOGGER.warning("Failed to fetch F2P JWKS from " + F2P_JWKS_URL);
         }
         
         StringBuilder sb = new StringBuilder();
@@ -144,7 +144,7 @@ public class DualJwksFetcher {
         
         cachedBaseKeysContent = sb.toString();
         lastBaseFetchMs = System.currentTimeMillis();
-        System.out.println("[DualAuth] Base JWKS update complete. Merged keys content length: " + cachedBaseKeysContent.length());
+        LOGGER.info("Base JWKS update complete. Merged keys content length: " + cachedBaseKeysContent.length());
     }
 
     public static String fetchJwksJson(String targetUrl) {
@@ -163,10 +163,10 @@ public class DualJwksFetcher {
                     return sb.toString();
                 }
             } else {
-                System.out.println("[DualAuth] JWKS fetch returned HTTP " + code + " for " + targetUrl);
+                LOGGER.warning("JWKS fetch returned HTTP " + code + " for " + targetUrl);
             }
         } catch (Exception e) {
-            System.out.println("[DualAuth] Exception fetching JWKS from " + targetUrl + ": " + e.getMessage());
+            LOGGER.warning("Exception fetching JWKS from " + targetUrl + ": " + e.getMessage());
         }
         return null;
     }

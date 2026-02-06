@@ -29,6 +29,7 @@ import java.util.logging.Logger;
  * Bypasses Nimbus strictness regarding private keys in 'jwk' header parameter.
  */
 public class EmbeddedJwkVerifier {
+    private static final Logger LOGGER = Logger.getLogger("DualAuthAgent");
 
     public static JWTClaimsSet verifyAndGetClaims(String token) {
         try {
@@ -57,21 +58,21 @@ public class EmbeddedJwkVerifier {
             String issuer = claims.getIssuer();
 
             if (!DualAuthHelper.isOmniIssuerTrusted(issuer)) {
-                System.out.println("[DualAuth] Issuer untrusted for Omni-Auth: " + issuer);
+                LOGGER.info("Issuer untrusted for Omni-Auth: " + issuer);
                 return null;
             } else if (Boolean.getBoolean("dualauth.debug.omni")) {
-                System.out.println("[DualAuth] Omni-Auth issuer TRUSTED: " + issuer);
+                LOGGER.info("Omni-Auth issuer TRUSTED: " + issuer);
             }
 
             // 3. Verify signature using Native EdDSA (Bypasses all Nimbus verification logic)
-            System.out.println("[DualAuth] Verifying Omni-Auth token via Native JCE (Lenient)...");
+            LOGGER.info("Verifying Omni-Auth token via Native JCE (Lenient)...");
             PublicKey publicKey = DualAuthHelper.toNativePublic(kp);
             Signature sig = Signature.getInstance("Ed25519");
             sig.initVerify(publicKey);
             sig.update(token.substring(0, dot2).getBytes(StandardCharsets.UTF_8));
 
             if (!sig.verify(Base64URL.from(signaturePart).decode())) {
-                System.out.println("[DualAuth] Omni-Auth: Signature mismatch");
+                LOGGER.info("Omni-Auth: Signature mismatch");
                 return null;
             }
 
@@ -90,7 +91,7 @@ public class EmbeddedJwkVerifier {
             return claims;
         } catch (Exception e) {
             // Only catch Exception, not Throwable, to avoid hiding critical errors
-            System.out.println("[DualAuth] Omni-Auth Verification Error: " + e.getMessage());
+            LOGGER.info("Omni-Auth Verification Error: " + e.getMessage());
             if (Boolean.getBoolean("dualauth.debug")) {
                 e.printStackTrace();
             }
@@ -100,8 +101,8 @@ public class EmbeddedJwkVerifier {
 
     public static String createSignedToken(String issuer, String tokenType) {
         if (Boolean.getBoolean("dualauth.debug")) {
-            System.out.println("[DualAuth] DEBUG: createSignedToken called with issuer: " + issuer);
-            System.out.println("[DualAuth] DEBUG: createSignedToken - Current DualAuthContext issuer: " + DualAuthContext.getIssuer());
+            LOGGER.info("DEBUG: createSignedToken called with issuer: " + issuer);
+            LOGGER.info("DEBUG: createSignedToken - Current DualAuthContext issuer: " + DualAuthContext.getIssuer());
         }
         
         try {
@@ -110,7 +111,7 @@ public class EmbeddedJwkVerifier {
             OctetKeyPair kp = OctetKeyPair.parse(jwkJson);
             
             if (!kp.isPrivate()) {
-                System.out.println("[DualAuth] Cannot sign Omni-Auth token: Private key 'd' missing in captured JWK");
+                LOGGER.info("Cannot sign Omni-Auth token: Private key 'd' missing in captured JWK");
                 return null;
             }
 
@@ -124,7 +125,7 @@ public class EmbeddedJwkVerifier {
                     .expirationTime(new Date(System.currentTimeMillis() + 3600_000L));
             
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] DEBUG: createSignedToken - Setting issuer in JWT claims: " + issuer);
+                LOGGER.info("DEBUG: createSignedToken - Setting issuer in JWT claims: " + issuer);
             }
 
             // Subject = Server UUID
@@ -160,12 +161,12 @@ public class EmbeddedJwkVerifier {
             String token = signedJWT.serialize();
 
             if (Boolean.getBoolean("dualauth.debug.omni")) {
-                System.out.println("[DualAuth] Generated Omni-Auth " + tokenType + " token to " + issuer);
+                LOGGER.info("Generated Omni-Auth " + tokenType + " token to " + issuer);
             }
             
             return token;
         } catch (Exception e) {
-            System.out.println("[DualAuth] Token Sign Failure: " + e.getMessage());
+            LOGGER.info("Token Sign Failure: " + e.getMessage());
             return null;
         }
     }

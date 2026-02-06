@@ -75,7 +75,7 @@ public class DualAuthHelper {
         // 1. Check Blacklist
         if (DualAuthConfig.ISSUER_BLACKLIST.contains(issuer)) {
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] Issuer is blacklisted: " + issuer);
+                LOGGER.info("Issuer is blacklisted: " + issuer);
             }
             return false;
         }
@@ -85,7 +85,7 @@ public class DualAuthHelper {
         if (currentTokenJwk != null && !currentTokenJwk.isEmpty()) {
             if (Boolean.getBoolean("dualauth.debug")) {
                 System.out
-                        .println("[DualAuth] Current token has embedded JWK: not treating issuer as public: " + issuer);
+                        .println("Current token has embedded JWK: not treating issuer as public: " + issuer);
             }
             return false; // This specific token is Omni-Auth, don't treat issuer as public
         }
@@ -93,7 +93,7 @@ public class DualAuthHelper {
         // 3. TRUSTED_ISSUERS: Treat as public (no detection needed)
         if (DualAuthConfig.TRUSTED_ISSUERS.contains(issuer)) {
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] Trusted issuer: treating as public (no detection): " + issuer);
+                LOGGER.info("Trusted issuer: treating as public (no detection): " + issuer);
             }
             return true;
         }
@@ -108,8 +108,8 @@ public class DualAuthHelper {
                 .get(issuer);
         if (cached != null && !cached.isExpired()) {
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println(
-                        "[DualAuth] Using cached detection for issuer: " + issuer + " -> public: " + cached.isPublic());
+                LOGGER.info(
+                        "Using cached detection for issuer: " + issuer + " -> public: " + cached.isPublic());
             }
             return cached.isPublic();
         }
@@ -119,7 +119,7 @@ public class DualAuthHelper {
         startBackgroundDetection(issuer);
 
         if (Boolean.getBoolean("dualauth.debug")) {
-            System.out.println("[DualAuth] Starting background detection for issuer: " + issuer
+            LOGGER.info("Starting background detection for issuer: " + issuer
                     + " (returning conservative default)");
         }
 
@@ -135,7 +135,7 @@ public class DualAuthHelper {
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
                 if (Boolean.getBoolean("dualauth.debug")) {
-                    System.out.println("[DualAuth] Background detection started for: " + issuer);
+                    LOGGER.info("Background detection started for: " + issuer);
                 }
 
                 boolean isPublic = performJwksDetection(issuer);
@@ -144,15 +144,15 @@ public class DualAuthHelper {
                 cacheDetectionResult(issuer, isPublic, null);
 
                 if (Boolean.getBoolean("dualauth.debug")) {
-                    System.out.println(
-                            "[DualAuth] Background detection completed for: " + issuer + " -> public: " + isPublic);
+                    LOGGER.info(
+                            "Background detection completed for: " + issuer + " -> public: " + isPublic);
                 }
             } catch (Exception e) {
                 // Cache failure result
                 cacheDetectionResult(issuer, false, e);
                 if (Boolean.getBoolean("dualauth.debug")) {
                     System.out
-                            .println("[DualAuth] Background detection failed for: " + issuer + " -> " + e.getMessage());
+                            .println("Background detection failed for: " + issuer + " -> " + e.getMessage());
                 }
             }
         });
@@ -170,19 +170,19 @@ public class DualAuthHelper {
             cacheDetectionResult(issuer, isPublic, null);
 
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] Detected issuer: " + issuer + " -> public: " + isPublic);
+                LOGGER.info("Detected issuer: " + issuer + " -> public: " + isPublic);
             }
             return isPublic;
         } catch (java.util.concurrent.TimeoutException e) {
             cacheDetectionResult(issuer, false, e);
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] Detection timeout for issuer: " + issuer + " -> assuming not public");
+                LOGGER.info("Detection timeout for issuer: " + issuer + " -> assuming not public");
             }
             return false;
         } catch (Exception e) {
             cacheDetectionResult(issuer, false, e);
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] Detection error for issuer: " + issuer + " -> " + e.getMessage());
+                System.out.println("Detection error for issuer: " + issuer + " -> " + e.getMessage());
             }
             return false;
         }
@@ -223,22 +223,22 @@ public class DualAuthHelper {
                         java.nio.charset.StandardCharsets.UTF_8);
                 if (isValidJwksResponse(responseBody)) {
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] Valid JWKS found at: " + jwksUrl);
+                        System.out.println("Valid JWKS found at: " + jwksUrl);
                     }
                     return true;
                 } else {
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] Invalid JWKS format at: " + jwksUrl);
+                        System.out.println("Invalid JWKS format at: " + jwksUrl);
                     }
                 }
             } else {
                 if (Boolean.getBoolean("dualauth.debug")) {
-                    System.out.println("[DualAuth] JWKS endpoint returned: " + responseCode + " for: " + jwksUrl);
+                    System.out.println("JWKS endpoint returned: " + responseCode + " for: " + jwksUrl);
                 }
             }
         } catch (Exception e) {
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] JWKS detection failed for " + issuer + ": " + e.getMessage());
+                System.out.println("JWKS detection failed for " + issuer + ": " + e.getMessage());
             }
         }
         return false;
@@ -395,7 +395,7 @@ public class DualAuthHelper {
                     clazz = cl.loadClass(targetClassName);
                 } catch (Exception e) {
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] Could not load preferred class: " + targetClassName);
+                        System.out.println("Could not load preferred class: " + targetClassName);
                     }
                 }
             }
@@ -466,7 +466,7 @@ public class DualAuthHelper {
 
             return wrapper;
         } catch (Exception e) {
-            System.err.println("[DualAuth] Failed to wrap claims: " + e.getMessage());
+            System.err.println("Failed to wrap claims: " + e.getMessage());
             return null;
         }
     }
@@ -494,14 +494,14 @@ public class DualAuthHelper {
                             // Use the server's expected issuer format for compatibility
                             finalIssuer = DualAuthConfig.F2P_ISSUER;
                             if (Boolean.getBoolean("dualauth.debug")) {
-                                System.out.println("[DualAuth] Using base domain matching: " + issuer + " -> "
+                                System.out.println("Using base domain matching: " + issuer + " -> "
                                         + finalIssuer + " (base domain: " + issuerBaseDomain + ")");
                             }
                         }
 
                         f.set(validator, finalIssuer);
                         if (Boolean.getBoolean("dualauth.debug")) {
-                            System.out.println("[DualAuth] Updated expectedIssuer to: " + finalIssuer + " in "
+                            System.out.println("Updated expectedIssuer to: " + finalIssuer + " in "
                                     + clazz.getSimpleName());
                         }
                     }
@@ -512,7 +512,7 @@ public class DualAuthHelper {
                         f.set(validator, sId);
                         if (Boolean.getBoolean("dualauth.debug")) {
                             System.out.println(
-                                    "[DualAuth] Updated expectedAudience to: " + sId + " in " + clazz.getSimpleName());
+                                    "Updated expectedAudience to: " + sId + " in " + clazz.getSimpleName());
                         }
                     }
                 }
@@ -581,7 +581,7 @@ public class DualAuthHelper {
             }
         } catch (Exception e) {
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.err.println("[DualAuth] getF error for field " + name + ": " + e.getMessage());
+                System.err.println("getF error for field " + name + ": " + e.getMessage());
             }
         }
         return null;
@@ -636,8 +636,8 @@ public class DualAuthHelper {
                 if (omniToken != null) {
                     idField.set(authGrant, omniToken);
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] Replaced with Omni-Auth server identity token");
-                    }
+                    LOGGER.info("Replaced with Omni-Auth server identity token");
+                }
                     return;
                 }
             }
@@ -653,7 +653,7 @@ public class DualAuthHelper {
                 String clientIssuer = issuer; // Keep the exact issuer the client used
 
                 if (Boolean.getBoolean("dualauth.debug")) {
-                    System.out.println("[DualAuth] Server Identity: Attempting to get token for exact client issuer: "
+                    System.out.println("Server Identity: Attempting to get token for exact client issuer: "
                             + clientIssuer);
                 }
 
@@ -666,7 +666,7 @@ public class DualAuthHelper {
                     String actualTokenIssuer = extractIssuerFromToken(correctedToken);
 
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] Server Identity: Got token with actual issuer: "
+                        System.out.println("Server Identity: Got token with actual issuer: "
                                 + actualTokenIssuer + " (expected: " + clientIssuer + ")");
                     }
 
@@ -677,7 +677,7 @@ public class DualAuthHelper {
                     if (actualTokenIssuer != null && !actualTokenIssuer.equals(clientIssuer)) {
                         if (Boolean.getBoolean("dualauth.debug")) {
                             System.out.println(
-                                    "[DualAuth] Server Identity: Token issuer mismatch - expected " + clientIssuer +
+                                    "Server Identity: Token issuer mismatch - expected " + clientIssuer +
                                             " but got " + actualTokenIssuer
                                             + " - This may cause signature verification issues if we modify it");
                         }
@@ -692,16 +692,16 @@ public class DualAuthHelper {
 
                     if (Boolean.getBoolean("dualauth.debug")) {
                         String finalTokenIssuer = extractIssuerFromToken(correctedToken);
-                        System.out.println("[DualAuth] AuthGrant: Replaced serverIdentityToken for issuer: " + issuer
+                        System.out.println("AuthGrant: Replaced serverIdentityToken for issuer: " + issuer
                                 + " -> " + finalTokenIssuer + " (len=" + correctedToken.length() + ")");
 
                         // DEBUG: Verify the token was actually set
                         try {
                             String verifyToken = (String) idField.get(authGrant);
                             String verifyIssuer = extractIssuerFromToken(verifyToken);
-                            System.out.println("[DualAuth] DEBUG: Final token in AuthGrant: " + verifyIssuer);
+                            System.out.println("DEBUG: Final token in AuthGrant: " + verifyIssuer);
                         } catch (Exception e) {
-                            System.out.println("[DualAuth] DEBUG: Error verifying final token: " + e.getMessage());
+                            System.out.println("DEBUG: Error verifying final token: " + e.getMessage());
                         }
                     }
                 } else {
@@ -709,7 +709,7 @@ public class DualAuthHelper {
                     // signature issues
                     // Each issuer should get its own properly signed token from its own endpoint
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] Server Identity: No token found for exact issuer " + clientIssuer
+                        System.out.println("Server Identity: No token found for exact issuer " + clientIssuer
                                 + " - skipping base domain fallback to preserve signature integrity");
                     }
 
@@ -717,7 +717,7 @@ public class DualAuthHelper {
                     idField.set(authGrant, null);
                     if (Boolean.getBoolean("dualauth.debug")) {
                         System.out.println(
-                                "[DualAuth] AuthGrant: Suppressed serverIdentityToken (no replacement found) for issuer: "
+                                "AuthGrant: Suppressed serverIdentityToken (no replacement found) for issuer: "
                                         + issuer);
                     }
                 }
@@ -728,13 +728,13 @@ public class DualAuthHelper {
             if (issuer != null && isOfficialIssuerStrict(issuer)) {
                 if (Boolean.getBoolean("dualauth.debug")) {
                     System.out.println(
-                            "[DualAuth] AuthGrant: Keeping serverIdentityToken for official issuer: " + issuer);
+                            "AuthGrant: Keeping serverIdentityToken for official issuer: " + issuer);
                 }
             }
 
         } catch (Exception e) {
             if (Boolean.getBoolean("dualauth.debug")) {
-                System.out.println("[DualAuth] AuthGrant: Error in maybeReplaceServerIdentity: " + e.getMessage());
+                System.out.println("AuthGrant: Error in maybeReplaceServerIdentity: " + e.getMessage());
             }
         }
     }

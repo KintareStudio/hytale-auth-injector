@@ -22,7 +22,7 @@ public class ServerAuthManagerTransformer implements net.bytebuddy.agent.builder
 
     @Override
     public DynamicType.Builder<?> transform(DynamicType.Builder<?> builder, TypeDescription typeDescription, ClassLoader classLoader, net.bytebuddy.utility.JavaModule module, java.security.ProtectionDomain pd) {
-        System.out.println("[DualAuth] ServerAuthManagerTransformer: Transforming " + typeDescription.getName());
+        System.out.println("[DualAuthAgent] ServerAuthManagerTransformer: Transforming " + typeDescription.getName());
         
         return builder
             // 1. Void Capture: Capture from instance field after initialize()

@@ -26,11 +26,11 @@ public class LoggingTransformer implements net.bytebuddy.agent.builder.AgentBuil
             ClassLoader classLoader, net.bytebuddy.utility.JavaModule module, java.security.ProtectionDomain pd) {
         if (!LOGGING_ENABLED) {
             System.out.println(
-                    "[DualAuth] LoggingTransformer: Disabled by environment variable DUALAUTH_LOGGING_ENABLED=false");
+                    "LoggingTransformer: Disabled by environment variable DUALAUTH_LOGGING_ENABLED=false");
             return builder; // Don't apply transformation if disabled
         }
 
-        System.out.println("[DualAuth] LoggingTransformer: Transforming " + typeDescription.getName());
+        System.out.println("LoggingTransformer: Transforming " + typeDescription.getName());
 
         return builder
                 .visit(Advice.to(LoggingAdvice.class).on(
@@ -65,37 +65,17 @@ public class LoggingTransformer implements net.bytebuddy.agent.builder.AgentBuil
                 // Get the current time in HH:mm format
                 String time = LocalTime.now().format(TIME_FORMATTER);
 
-                // Determine color and format based on the content of the message
-                String message = originalMessage != null ? originalMessage : "";
-                String lowerMessage = message.toLowerCase();
-
-                // Check if the message is related to DualAuth
-                boolean isDualAuthMessage = lowerMessage.contains("dualauth") || lowerMessage.contains("auth") ||
-                        lowerMessage.contains("token") || lowerMessage.contains("issuer") ||
-                        lowerMessage.contains("session") || lowerMessage.contains("jwt");
-
-                // Determine color based on if it is a DualAuth message
-                String colorCode = isDualAuthMessage ? "\033[95m" : getColorCodeForLevel(level, false);
+                // Use standard color based on log level (no special DualAuth coloring)
+                String colorCode = getColorCodeForLevel(level, false);
                 String resetCode = "\033[m";
 
-                // Format the message with a special prefix if it is a DualAuth message
-                if (isDualAuthMessage) {
-                    formattedOutput = String.format("%s[%s] (%s)%s %s[🔒 DUALAUTH] %s%s",
-                            colorCode,
-                            time,
-                            loggerName,
-                            resetCode,
-                            colorCode,
-                            message,
-                            resetCode);
-                } else {
-                    formattedOutput = String.format("%s[%s] (%s)%s %s",
-                            colorCode,
-                            time,
-                            loggerName,
-                            resetCode,
-                            message);
-                }
+                // Format the message with standard colors
+                formattedOutput = String.format("%s[%s] (%s)%s %s",
+                        colorCode,
+                        time,
+                        loggerName,
+                        resetCode,
+                        originalMessage != null ? originalMessage : "");
 
             } catch (Exception e) {
                 System.err.println("Error in LoggingAdvice enter: " + e.getMessage());

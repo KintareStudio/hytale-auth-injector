@@ -24,7 +24,7 @@ public class SessionServiceClientTransformer implements net.bytebuddy.agent.buil
             return builder;
         }
 
-        System.out.println("[DualAuth] SessionServiceClientTransformer: Transforming " + name);
+        System.out.println("[DualAuthAgent] SessionServiceClientTransformer: Transforming " + name);
 
         return builder
             .visit(Advice.to(JwksFetchAdvice.class).on(
@@ -48,7 +48,7 @@ public class SessionServiceClientTransformer implements net.bytebuddy.agent.buil
                 String currentIssuer = DualAuthContext.getIssuer();
                 if (currentIssuer != null && DualAuthHelper.isOfficialIssuer(currentIssuer)) {
                     if (Boolean.getBoolean("dualauth.debug")) {
-                        System.out.println("[DualAuth] JwksFetchAdvice: Using original JWKS flow for official issuer: " + currentIssuer);
+                        System.out.println("[DualAuthAgent] JwksFetchAdvice: Using original JWKS flow for official issuer: " + currentIssuer);
                     }
                     return null; // Let original flow handle official issuers
                 }
@@ -91,7 +91,7 @@ public class SessionServiceClientTransformer implements net.bytebuddy.agent.buil
                 if (urlField != null) {
                     urlField.setAccessible(true);
                     String currentUrl = (String) urlField.get(thiz);
-                    // System.out.println("[DualAuth] SessionServiceClient: " + currentUrl);
+                    // System.out.println("SessionServiceClient: " + currentUrl);
                 }
             } catch (Exception ignored) {}
         }

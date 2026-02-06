@@ -1,8 +1,11 @@
 package com.hytale.dualauth.context;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 public class DualAuthContext {
+    private static final Logger LOGGER = Logger.getLogger("DualAuthAgent");
+    
     private static final ThreadLocal<String> currentIssuer = new ThreadLocal<>();
     private static final ThreadLocal<String> currentJwk = new ThreadLocal<>();
     private static final ThreadLocal<String> currentPlayerUuid = new ThreadLocal<>();
@@ -108,7 +111,7 @@ public class DualAuthContext {
             
             // Debug logging if enabled
             if (Boolean.getBoolean("dualauth.debug.connections")) {
-                System.out.println("[DualAuth] Connection boundary: context reset completed");
+                LOGGER.info("Connection boundary: context reset completed");
             }
         } catch (Exception e) {
             // Last resort cleanup - don't let errors prevent context reset
@@ -120,7 +123,7 @@ public class DualAuthContext {
                 isCurrentTokenOmni.remove();
             } catch (Exception ignored) {
                 // If even this fails, log but don't crash
-                System.err.println("[DualAuth] Critical error in context reset: " + e.getMessage());
+                LOGGER.warning("Critical error in context reset: " + e.getMessage());
             }
         }
     }

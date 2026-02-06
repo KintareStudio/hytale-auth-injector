@@ -7,12 +7,12 @@ public class DualAuthWarmup implements Runnable {
     public void run() {
         try {
             Thread.sleep(5000);
-            System.err.println("[DualAuth] Triggering F2P identity token pre-fetch...");
+            System.err.println("Triggering F2P identity token pre-fetch...");
             DualServerTokenManager.ensureF2PTokens();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
-            System.err.println("[DualAuth] Error during async warm-up: " + e.getMessage());
+            System.err.println("Error during async warm-up: " + e.getMessage());
         }
     }
 
