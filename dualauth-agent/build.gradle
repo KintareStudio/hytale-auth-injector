@@ -5,8 +5,8 @@ plugins {
 
 group = 'com.hytale.dualauth'
 
-// Only change the version here
-version = '1.1.4'
+// Only change the version here and in dualauth-agent/src/main/resources/manifest.json
+version = '1.1.5'
 
 java {
     toolchain {
@@ -38,16 +38,21 @@ shadowJar {
     archiveBaseName.set('dualauth-agent')
     manifest {
         attributes(
+            // Config for -javaagent mode
             'Main-Class': 'com.hytale.dualauth.agent.DualAuthAgent',
             'Premain-Class': 'com.hytale.dualauth.agent.DualAuthAgent',
-            'Implementation-Version': project.version,
+            'Agent-Class': 'com.hytale.dualauth.agent.DualAuthAgent', // For dynamic attach
             'Can-Redefine-Classes': 'true',
             'Can-Retransform-Classes': 'true',
-            'Boot-Class-Path': '.' 
+            'Implementation-Version': project.version
         )
     }
     
     relocate 'net.bytebuddy', 'com.hytale.dualauth.libs.bytebuddy'
+
+    // CRITICAL: Exclude Hytale API stubs from final JAR
+    // We only use these for compilation; at runtime Hytale provides the real classes
+    exclude 'com/hypixel/hytale/server/core/plugin/**'
 
     exclude 'META-INF/*.SF'
     exclude 'META-INF/*.DSA'
