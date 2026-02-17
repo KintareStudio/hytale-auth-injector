@@ -38,6 +38,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      server_jar_hash: ${{ steps.server_hash.outputs.hash }}
 
     steps:
       - name: Checkout
@@ -70,6 +71,13 @@ jobs:
           echo "Downloading server JAR from: $SERVER_JAR_URL"
           curl -sfL "$SERVER_JAR_URL" -o HytaleServer.jar
           ls -lh HytaleServer.jar
+
+      - name: Compute Server JAR Hash
+        id: server_hash
+        run: |
+          HASH=$(sha256sum HytaleServer.jar | cut -d' ' -f1 | head -c16)
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+          echo "Server JAR hash (first 16 chars): $HASH"
 
       - name: Upload Agent Artifact
         uses: actions/upload-artifact@v4
@@ -113,9 +121,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: server/Assets.zip
-          key: hytale-assets-v1
-          restore-keys: |
-            hytale-assets-
+          key: hytale-assets-${{ needs.build-agent.outputs.server_jar_hash }}
 
       - name: Download Assets
         if: steps.cache-assets.outputs.cache-hit != 'true'
@@ -175,6 +181,13 @@ jobs:
               BYTECODE_ERROR=true
               kill $SERVER_PID 2>/dev/null || true
               break
+            fi
+
+            # Check for asset validation failure
+            if grep -q "Asset validation FAILED" server.log 2>/dev/null; then
+              echo "::warning::Asset validation failed - Assets.zip may not match server JAR version"
+              grep -A2 "Asset validation FAILED" server.log
+              # Don't fail here - test-server-boot only checks patcher compatibility
             fi
 
             # Check for successful boot - match actual log: "Hytale Server Booted!"
@@ -280,9 +293,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: server/Assets.zip
-          key: hytale-assets-v1
-          restore-keys: |
-            hytale-assets-
+          key: hytale-assets-${{ needs.build-agent.outputs.server_jar_hash }}
 
       - name: Download Assets
         if: steps.cache-assets.outputs.cache-hit != 'true'
@@ -384,6 +395,11 @@ jobs:
             if grep -qE "NoSuchFieldError|NoSuchMethodError|ClassNotFoundException|VerifyError" server.log 2>/dev/null; then
               echo "Bytecode error - patcher incompatible"
               cat server.log
+              exit 1
+            fi
+            if grep -q "Asset validation FAILED" server.log 2>/dev/null; then
+              echo "::error::Asset validation failed - Assets.zip doesn't match server JAR version"
+              grep -A2 "Asset validation FAILED" server.log
               exit 1
             fi
             sleep 3
@@ -682,6 +698,11 @@ jobs:
               cat server_strict.log
               exit 1
             fi
+            if grep -q "Asset validation FAILED" server_strict.log 2>/dev/null; then
+              echo "::error::Asset validation failed - Assets.zip doesn't match server JAR version"
+              grep -A2 "Asset validation FAILED" server_strict.log
+              exit 1
+            fi
             sleep 3
             ELAPSED=$((ELAPSED + 3))
             echo "... waiting ($ELAPSED/$TIMEOUT)"
@@ -813,6 +834,11 @@ jobs:
               cat server_strict_pure.log
               exit 1
             fi
+            if grep -q "Asset validation FAILED" server_strict_pure.log 2>/dev/null; then
+              echo "::error::Asset validation failed - Assets.zip doesn't match server JAR version"
+              grep -A2 "Asset validation FAILED" server_strict_pure.log
+              exit 1
+            fi
             sleep 3
             ELAPSED=$((ELAPSED + 3))
             echo "... waiting ($ELAPSED/$TIMEOUT)"
@@ -934,6 +960,11 @@ jobs:
             if grep -qE "NoSuchFieldError|NoSuchMethodError|ClassNotFoundException|VerifyError" server_trusted.log 2>/dev/null; then
               echo "Bytecode error - patcher incompatible"
               cat server_trusted.log
+              exit 1
+            fi
+            if grep -q "Asset validation FAILED" server_trusted.log 2>/dev/null; then
+              echo "::error::Asset validation failed - Assets.zip doesn't match server JAR version"
+              grep -A2 "Asset validation FAILED" server_trusted.log
               exit 1
             fi
             sleep 3
@@ -1141,6 +1172,11 @@ jobs:
               cat server_no_tokens.log
               exit 1
             fi
+            if grep -q "Asset validation FAILED" server_no_tokens.log 2>/dev/null; then
+              echo "::error::Asset validation failed - Assets.zip doesn't match server JAR version"
+              grep -A2 "Asset validation FAILED" server_no_tokens.log
+              exit 1
+            fi
             sleep 3
             ELAPSED=$((ELAPSED + 3))
             echo "... waiting ($ELAPSED/$TIMEOUT)"
@@ -1293,9 +1329,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: server/Assets.zip
-          key: hytale-assets-v1
-          restore-keys: |
-            hytale-assets-
+          key: hytale-assets-${{ needs.build-agent.outputs.server_jar_hash }}
 
       - name: Download Assets
         if: steps.cache-assets.outputs.cache-hit != 'true'
@@ -1353,6 +1387,16 @@ jobs:
               grep -E "NoSuchFieldError|NoSuchMethodError|ClassNotFoundException|VerifyError" server_plugin.log | head -5
               BYTECODE_ERROR=true
               kill $SERVER_PID 2>/dev/null || true
+              break
+            fi
+
+            # Check for asset validation failure
+            if grep -q "Asset validation FAILED" server_plugin.log 2>/dev/null; then
+              echo ""
+              echo "::error::Asset validation failed - Assets.zip doesn't match server JAR version"
+              grep -A2 "Asset validation FAILED" server_plugin.log
+              kill $SERVER_PID 2>/dev/null || true
+              BYTECODE_ERROR=true
               break
             fi
 
