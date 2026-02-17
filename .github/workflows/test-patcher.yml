@@ -1,4 +1,4 @@
-name: Test DualAuth Patcher
+name: Test DualAuth Agent
 
 on:
   push:
@@ -14,7 +14,7 @@ on:
     inputs:
       server_jar_url:
         description: 'Server JAR URL'
-        default: 'https://download.sanasol.ws/download/HytaleServerOriginal.jar'
+        default: 'https://download.sanasol.ws/download/HytaleServer.jar'
         required: false
       assets_url:
         description: 'Assets.zip URL'
@@ -26,7 +26,7 @@ on:
         default: false
 
 env:
-  SERVER_JAR_URL: ${{ inputs.server_jar_url || 'https://download.sanasol.ws/download/HytaleServerOriginal.jar' }}
+  SERVER_JAR_URL: ${{ inputs.server_jar_url || 'https://download.sanasol.ws/download/HytaleServer.jar' }}
   ASSETS_URL: ${{ inputs.assets_url || 'https://download.sanasol.ws/download/Assets.zip' }}
   HYTALE_AUTH_DOMAIN: 'auth.sanasol.ws'
   HYTALE_AUTH_URL: 'https://auth.sanasol.ws'
@@ -54,7 +54,7 @@ jobs:
         working-directory: dualauth-agent
         run: |
           chmod +x ./gradlew
-          ./gradlew clean shadowJar --stacktrace --info
+          ./gradlew clean build --stacktrace --info
           ls -la build/libs/*.jar
 
       - name: Extract version
@@ -65,11 +65,11 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Download Original Server JAR
+      - name: Download Server JAR
         run: |
           echo "Downloading server JAR from: $SERVER_JAR_URL"
-          curl -sfL "$SERVER_JAR_URL" -o HytaleServerOriginal.jar
-          ls -lh HytaleServerOriginal.jar
+          curl -sfL "$SERVER_JAR_URL" -o HytaleServer.jar
+          ls -lh HytaleServer.jar
 
       - name: Upload Agent Artifact
         uses: actions/upload-artifact@v4
@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: server-jar
-          path: HytaleServerOriginal.jar
+          path: HytaleServer.jar
           retention-days: 7
 
   test-server-boot:
@@ -146,7 +146,7 @@ jobs:
           echo "Testing for bytecode patching errors (NoSuchFieldError, etc.)"
           echo ""
 
-          java -Xmx2G -javaagent:dualauth-agent.jar -jar HytaleServerOriginal.jar \
+          java -Xmx2G -javaagent:dualauth-agent.jar -jar HytaleServer.jar \
             --assets Assets.zip \
             --bare \
             --disable-sentry \
@@ -212,7 +212,7 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
           sleep 1
           kill -9 $SERVER_PID 2>/dev/null || true
-          pkill -9 -f HytaleServerOriginal.jar 2>/dev/null || true
+          pkill -9 -f HytaleServer.jar 2>/dev/null || true
 
           echo ""
           echo "=== Server Log (last 20 lines) ==="
@@ -357,7 +357,7 @@ jobs:
           echo "Starting Hytale server..."
           java -Xmx2G \
             -javaagent:dualauth-agent.jar \
-            -jar HytaleServerOriginal.jar \
+            -jar HytaleServer.jar \
             --assets Assets.zip \
             --bind 0.0.0.0:5520 \
             --universe universe_ci \
@@ -634,7 +634,7 @@ jobs:
             sleep 1
             kill -9 $(cat server/server.pid) 2>/dev/null || true
           fi
-          pkill -9 -f HytaleServerOriginal.jar 2>/dev/null || true
+          pkill -9 -f HytaleServer.jar 2>/dev/null || true
           sleep 2
 
       # ==========================================
@@ -654,7 +654,7 @@ jobs:
           HYTALE_TRUST_ALL_ISSUERS=false \
           java -Xmx2G \
             -javaagent:dualauth-agent.jar \
-            -jar HytaleServerOriginal.jar \
+            -jar HytaleServer.jar \
             --assets Assets.zip \
             --bind 0.0.0.0:5522 \
             --universe universe_strict \
@@ -766,7 +766,7 @@ jobs:
             sleep 1
             kill -9 $(cat server/server_strict.pid) 2>/dev/null || true
           fi
-          pkill -9 -f HytaleServerOriginal.jar 2>/dev/null || true
+          pkill -9 -f HytaleServer.jar 2>/dev/null || true
           sleep 2
 
       # ==========================================
@@ -787,7 +787,7 @@ jobs:
           HYTALE_TRUST_ALL_ISSUERS=false \
           java -Xmx2G \
             -javaagent:dualauth-agent.jar \
-            -jar HytaleServerOriginal.jar \
+            -jar HytaleServer.jar \
             --assets Assets.zip \
             --bind 0.0.0.0:5524 \
             --universe universe_strict_pure \
@@ -893,7 +893,7 @@ jobs:
             sleep 1
             kill -9 $(cat server/server_strict_pure.pid) 2>/dev/null || true
           fi
-          pkill -9 -f HytaleServerOriginal.jar 2>/dev/null || true
+          pkill -9 -f HytaleServer.jar 2>/dev/null || true
           sleep 2
 
       - name: Start Server (strict mode - with trusted issuer allowlist)
@@ -910,7 +910,7 @@ jobs:
           HYTALE_TRUSTED_ISSUERS="127.0.0.1,localhost" \
           java -Xmx2G \
             -javaagent:dualauth-agent.jar \
-            -jar HytaleServerOriginal.jar \
+            -jar HytaleServer.jar \
             --assets Assets.zip \
             --bind 0.0.0.0:5523 \
             --universe universe_trusted \
@@ -1101,7 +1101,7 @@ jobs:
             sleep 1
             kill -9 $(cat server/server_trusted.pid) 2>/dev/null || true
           fi
-          pkill -9 -f HytaleServerOriginal.jar 2>/dev/null || true
+          pkill -9 -f HytaleServer.jar 2>/dev/null || true
           sleep 2
 
       - name: Start Server (no-tokens mode)
@@ -1115,7 +1115,7 @@ jobs:
           echo "Starting Hytale server WITHOUT tokens (no-tokens mode)..."
           java -Xmx2G \
             -javaagent:dualauth-agent.jar \
-            -jar HytaleServerOriginal.jar \
+            -jar HytaleServer.jar \
             --assets Assets.zip \
             --bind 0.0.0.0:5521 \
             --universe universe_no_tokens \
@@ -1251,7 +1251,7 @@ jobs:
             kill $(cat server/server_no_tokens.pid) 2>/dev/null || true
             kill -9 $(cat server/server_no_tokens.pid) 2>/dev/null || true
           fi
-          pkill -9 -f HytaleServerOriginal.jar 2>/dev/null || true
+          pkill -9 -f HytaleServer.jar 2>/dev/null || true
 
       - name: Upload Logs
         if: always()
@@ -1265,9 +1265,172 @@ jobs:
             server/server_no_tokens.log
           retention-days: 7
 
+  test-plugin-mode:
+    name: Test Plugin Mode (mods/ folder)
+    needs: build-agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ !inputs.skip_boot_test }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: Download Agent & Server
+        uses: actions/download-artifact@v4
+        with:
+          path: server
+          merge-multiple: true
+
+      - name: Cache Assets.zip
+        id: cache-assets
+        uses: actions/cache@v4
+        with:
+          path: server/Assets.zip
+          key: hytale-assets-v1
+          restore-keys: |
+            hytale-assets-
+
+      - name: Download Assets
+        if: steps.cache-assets.outputs.cache-hit != 'true'
+        working-directory: server
+        run: |
+          echo "Downloading Assets.zip (not cached)..."
+          curl -sfL "$ASSETS_URL" -o Assets.zip
+          ls -lh Assets.zip
+
+      - name: Install Agent as Plugin (mods/ folder)
+        working-directory: server
+        run: |
+          echo "=== Plugin Mode Test ==="
+          echo "Installing dualauth-agent.jar into mods/ folder (NO -javaagent flag)"
+          mkdir -p mods
+          cp dualauth-agent.jar mods/
+          ls -lh mods/
+          echo ""
+          echo "Server will be started WITHOUT -javaagent flag."
+          echo "The agent should load via Hytale plugin system and dynamically attach."
+
+      - name: Test Plugin Mode Boot
+        working-directory: server
+        timeout-minutes: 3
+        run: |
+          echo "Starting Hytale server in PLUGIN mode (no -javaagent)..."
+          echo "Agent JAR is in mods/ - Hytale plugin system should load it"
+          echo ""
+
+          java -Xmx2G -XX:+EnableDynamicAgentLoading -jar HytaleServer.jar \
+            --assets Assets.zip \
+            --bare \
+            --disable-sentry \
+            2>&1 | tee server_plugin.log &
+
+          SERVER_PID=$!
+          echo "Server PID: $SERVER_PID"
+
+          TIMEOUT=60
+          ELAPSED=0
+          SUCCESS=false
+          AGENT_LOADED=false
+          BYTECODE_ERROR=false
+
+          echo "Monitoring server boot (max ${TIMEOUT}s)..."
+
+          while kill -0 $SERVER_PID 2>/dev/null; do
+            sleep 2
+            ELAPSED=$((ELAPSED + 2))
+
+            # Check for bytecode errors
+            if grep -qE "NoSuchFieldError|NoSuchMethodError|ClassNotFoundException|VerifyError" server_plugin.log 2>/dev/null; then
+              echo ""
+              echo "::error::Bytecode patching error detected in plugin mode!"
+              grep -E "NoSuchFieldError|NoSuchMethodError|ClassNotFoundException|VerifyError" server_plugin.log | head -5
+              BYTECODE_ERROR=true
+              kill $SERVER_PID 2>/dev/null || true
+              break
+            fi
+
+            # Check if agent loaded via plugin system
+            if grep -qi "DualAuth.*Plugin\|Dynamic.*Attach\|plugin-mode\|DYNAMIC" server_plugin.log 2>/dev/null; then
+              AGENT_LOADED=true
+            fi
+
+            # Check for DualAuth agent installed message
+            if grep -qi "DualAuth.*installed\|Agent.*installed" server_plugin.log 2>/dev/null; then
+              AGENT_LOADED=true
+            fi
+
+            # Check for successful boot
+            if grep -qi "Server Booted" server_plugin.log 2>/dev/null; then
+              echo "Server booted successfully!"
+              SUCCESS=true
+              kill $SERVER_PID 2>/dev/null || true
+              sleep 1
+              kill -9 $SERVER_PID 2>/dev/null || true
+              break
+            fi
+
+            if [ $((ELAPSED % 10)) -eq 0 ]; then
+              echo "... waiting ($ELAPSED/${TIMEOUT}s)"
+            fi
+
+            if [ $ELAPSED -ge $TIMEOUT ]; then
+              echo "Timeout reached"
+              if grep -qi "Server Booted" server_plugin.log 2>/dev/null; then
+                SUCCESS=true
+              fi
+              break
+            fi
+          done
+
+          # Force kill
+          kill $SERVER_PID 2>/dev/null || true
+          sleep 1
+          kill -9 $SERVER_PID 2>/dev/null || true
+          pkill -9 -f HytaleServer.jar 2>/dev/null || true
+
+          echo ""
+          echo "=== DualAuth Plugin Messages ==="
+          grep -iE "DualAuth|plugin|dynamic|attach|agent" server_plugin.log | head -20 || echo "No DualAuth messages found"
+
+          echo ""
+          echo "=== Server Log (last 20 lines) ==="
+          tail -20 server_plugin.log
+
+          echo ""
+          echo "=== Plugin Mode Test Result ==="
+          if [ "$BYTECODE_ERROR" = true ]; then
+            echo "FAILED: Bytecode error in plugin mode"
+            exit 1
+          elif [ "$SUCCESS" = true ] && [ "$AGENT_LOADED" = true ]; then
+            echo "PASSED: Server booted with agent loaded via plugin system"
+            exit 0
+          elif [ "$SUCCESS" = true ]; then
+            echo "WARNING: Server booted but could not confirm agent loaded via plugin"
+            echo "Check logs for DualAuth messages"
+            exit 0
+          else
+            echo "FAILED: Server did not boot in plugin mode"
+            exit 1
+          fi
+
+      - name: Upload Plugin Mode Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-mode-boot-log
+          path: server/server_plugin.log
+          retention-days: 7
+
   release:
     name: Deploy Release
-    needs: [build-agent, test-server-boot, test-mock-client]
+    needs: [build-agent, test-server-boot, test-mock-client, test-plugin-mode]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:

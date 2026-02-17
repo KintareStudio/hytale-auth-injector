@@ -1,19 +1,20 @@
 #!/bin/bash
-# Local test script for DualAuth Patcher
-# Tests patcher compilation, patching, server boot, and client connections
+# Local test script for DualAuth ByteBuddy Agent
+# Tests agent build, server boot with -javaagent:, and client connections
 #
-# Usage: ./test-local.sh [--skip-download] [--skip-client]
+# Usage: ./test-local.sh [--skip-download] [--skip-client] [--skip-build]
 #
 # Requirements:
 # - Java 21+
 # - curl
-# - unzip
 # - python3
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+AGENT_DIR="$SCRIPT_DIR/../dualauth-agent"
+WORK_DIR="$SCRIPT_DIR"
+cd "$WORK_DIR"
 
 # Find Java 21+ (required for Hytale server)
 find_java21() {
@@ -75,23 +76,16 @@ JAVA_CMD=$(find_java21) || {
 
 echo "Using Java: $JAVA_CMD"
 $JAVA_CMD -version 2>&1 | head -1
-
-# Derive javac path from java path
-JAVA_BIN_DIR=$(dirname "$JAVA_CMD")
-JAVAC_CMD="$JAVA_BIN_DIR/javac"
-if [ ! -x "$JAVAC_CMD" ]; then
-    JAVAC_CMD="javac"  # Fallback to PATH
-fi
-echo "Using javac: $JAVAC_CMD"
 echo ""
 
 # Configuration
 HYTALE_AUTH_URL="${HYTALE_AUTH_URL:-https://auth.sanasol.ws}"
 HYTALE_AUTH_DOMAIN="${HYTALE_AUTH_DOMAIN:-auth.sanasol.ws}"
-SERVER_JAR_URL="${SERVER_JAR_URL:-https://download.sanasol.ws/download/HytaleServerOriginal.jar}"
+SERVER_JAR_URL="${SERVER_JAR_URL:-https://download.sanasol.ws/download/HytaleServer.jar}"
 ASSETS_URL="${ASSETS_URL:-https://download.sanasol.ws/download/Assets.zip}"
 
 SKIP_CLIENT=false
+SKIP_BUILD=false
 FORCE_DOWNLOAD=false
 TOKEN_MODE="both"  # with-tokens, no-tokens, both
 
@@ -99,6 +93,7 @@ TOKEN_MODE="both"  # with-tokens, no-tokens, both
 for arg in "$@"; do
     case $arg in
         --skip-client) SKIP_CLIENT=true ;;
+        --skip-build) SKIP_BUILD=true ;;
         --force-download) FORCE_DOWNLOAD=true ;;
         --token-mode=*)
             TOKEN_MODE="${arg#*=}"
@@ -114,10 +109,11 @@ for arg in "$@"; do
         --help|-h)
             echo "Usage: $0 [options]"
             echo ""
-            echo "Tests DualAuth patcher compilation, patching, and server boot."
+            echo "Tests DualAuth ByteBuddy Agent build, server boot, and client connections."
             echo ""
             echo "Options:"
             echo "  --skip-client          Skip client connection tests"
+            echo "  --skip-build           Skip agent build (use existing JAR)"
             echo "  --force-download       Force re-download of JAR and Assets"
             echo "  --token-mode=MODE      Token mode: with-tokens, no-tokens, both (default: both)"
             echo "  --help, -h             Show this help"
@@ -128,7 +124,7 @@ for arg in "$@"; do
             echo "  both          Run both scenarios (default)"
             echo ""
             echo "Files are cached automatically:"
-            echo "  - HytaleServerOriginal.jar (reused if exists)"
+            echo "  - HytaleServer.jar (reused if exists)"
             echo "  - Assets.zip (reused if exists, 3+ GB)"
             echo ""
             echo "Environment variables:"
@@ -143,76 +139,51 @@ done
 echo "Token mode: $TOKEN_MODE"
 
 echo "=============================================="
-echo "  DualAuth Patcher - Local Test"
+echo "  DualAuth Agent - Local Test"
 echo "=============================================="
 echo ""
 echo "Auth Server: $HYTALE_AUTH_URL"
 echo "Auth Domain: $HYTALE_AUTH_DOMAIN"
 echo ""
 
-# Step 1: Download ASM libraries if needed
-echo "=== Step 1: Check ASM Libraries ==="
-if [ ! -f "lib/asm-9.6.jar" ]; then
-    echo "Downloading ASM libraries..."
-    mkdir -p lib
-    cd lib
-    curl -sfLO https://repo1.maven.org/maven2/org/ow2/asm/asm/9.6/asm-9.6.jar
-    curl -sfLO https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.6/asm-tree-9.6.jar
-    curl -sfLO https://repo1.maven.org/maven2/org/ow2/asm/asm-util/9.6/asm-util-9.6.jar
-    cd ..
-    echo "ASM libraries downloaded"
+# Step 1: Build agent
+echo "=== Step 1: Build DualAuth Agent ==="
+if [ "$SKIP_BUILD" = true ]; then
+    if [ -f "$AGENT_DIR/build/libs/dualauth-agent.jar" ]; then
+        echo "Skipping build (using existing agent JAR)"
+        cp "$AGENT_DIR/build/libs/dualauth-agent.jar" "$WORK_DIR/dualauth-agent.jar"
+    elif [ -f "$WORK_DIR/dualauth-agent.jar" ]; then
+        echo "Skipping build (using cached agent JAR in work dir)"
+    else
+        echo "ERROR: No agent JAR found. Remove --skip-build to build it."
+        exit 1
+    fi
 else
-    echo "ASM libraries already present"
+    echo "Building agent..."
+    cd "$AGENT_DIR"
+    chmod +x ./gradlew
+    ./gradlew clean shadowJar --stacktrace
+    cp build/libs/dualauth-agent.jar "$WORK_DIR/dualauth-agent.jar"
+    cd "$WORK_DIR"
+    echo "Agent built successfully"
 fi
+ls -lh "$WORK_DIR/dualauth-agent.jar"
 echo ""
 
-# Step 2: Compile patcher
-echo "=== Step 2: Compile Patcher ==="
-rm -f DualAuthPatcher*.class 2>/dev/null
-"$JAVAC_CMD" -cp "lib/*" DualAuthPatcher.java
-echo "Compilation successful"
-ls -la DualAuthPatcher*.class
-echo ""
-
-# Step 3: Download server JAR
-echo "=== Step 3: Download Server JAR ==="
-if [ -f "HytaleServerOriginal.jar" ] && [ "$FORCE_DOWNLOAD" = false ]; then
-    echo "Using cached HytaleServerOriginal.jar"
-    ls -lh HytaleServerOriginal.jar
+# Step 2: Download server JAR
+echo "=== Step 2: Download Server JAR ==="
+if [ -f "HytaleServer.jar" ] && [ "$FORCE_DOWNLOAD" = false ]; then
+    echo "Using cached HytaleServer.jar"
+    ls -lh HytaleServer.jar
 else
     echo "Downloading from: $SERVER_JAR_URL"
-    curl -sfL "$SERVER_JAR_URL" -o HytaleServerOriginal.jar
-    ls -lh HytaleServerOriginal.jar
-
-    # Check if already patched
-    if unzip -l HytaleServerOriginal.jar 2>/dev/null | grep -q "DualAuthContext.class"; then
-        echo "WARNING: Downloaded JAR appears to already be patched"
-    fi
+    curl -sfL "$SERVER_JAR_URL" -o HytaleServer.jar
+    ls -lh HytaleServer.jar
 fi
 echo ""
 
-# Step 4: Run patcher
-echo "=== Step 4: Run Patcher ==="
-rm -f HytaleServerPatched.jar 2>/dev/null
-"$JAVA_CMD" -cp ".:lib/*" DualAuthPatcher HytaleServerOriginal.jar HytaleServerPatched.jar
-
-echo ""
-echo "Verifying patched JAR..."
-DUAL_CLASSES=$(unzip -l HytaleServerPatched.jar 2>/dev/null | grep -c "DualAuth\|DualJwks\|DualServer" || echo "0")
-echo "DualAuth classes found: $DUAL_CLASSES"
-
-if [ "$DUAL_CLASSES" -lt 5 ]; then
-    echo "ERROR: Patching failed - expected at least 5 DualAuth classes"
-    exit 1
-fi
-
-unzip -l HytaleServerPatched.jar | grep -E "DualAuth|DualJwks|DualServer"
-echo ""
-echo "Patching successful!"
-echo ""
-
-# Step 5: Download Assets
-echo "=== Step 5: Download Assets ==="
+# Step 3: Download Assets
+echo "=== Step 3: Download Assets ==="
 if [ -f "Assets.zip" ] && [ "$FORCE_DOWNLOAD" = false ]; then
     echo "Using cached Assets.zip"
     ls -lh Assets.zip
@@ -224,8 +195,8 @@ else
 fi
 echo ""
 
-# Step 6: Verify auth server and get tokens
-echo "=== Step 6: Verify Auth Server & Get Tokens ==="
+# Step 4: Verify auth server and get tokens
+echo "=== Step 4: Verify Auth Server & Get Tokens ==="
 echo "Checking $HYTALE_AUTH_URL..."
 
 if ! curl -sf "$HYTALE_AUTH_URL/health" >/dev/null 2>&1; then
@@ -345,10 +316,10 @@ run_server_test() {
     mkdir -p "$data_dir"
     echo "Using isolated data directory: $data_dir"
 
-    # Start server based on mode
+    # Start server with ByteBuddy agent
     if [ "$mode" = "with-tokens" ]; then
         echo "Starting server WITH explicit tokens..."
-        "$JAVA_CMD" -Xmx2G -jar HytaleServerPatched.jar \
+        "$JAVA_CMD" -Xmx2G -javaagent:dualauth-agent.jar -jar HytaleServer.jar \
             --assets Assets.zip \
             --bind "0.0.0.0:$port" \
             --universe "$data_dir" \
@@ -358,7 +329,7 @@ run_server_test() {
             > "$log_file" 2>&1 &
     else
         echo "Starting server WITHOUT tokens (auto-fetch mode)..."
-        "$JAVA_CMD" -Xmx2G -jar HytaleServerPatched.jar \
+        "$JAVA_CMD" -Xmx2G -javaagent:dualauth-agent.jar -jar HytaleServer.jar \
             --assets Assets.zip \
             --bind "0.0.0.0:$port" \
             --universe "$data_dir" \
@@ -500,7 +471,6 @@ except:
         sleep 1
 
         # Test 1 passes if: auth grant obtained successfully AND no server-side errors
-        # Error patterns that indicate failure:
         local error_patterns="Server session token not available|authentication unavailable|UUID mismatch|Invalid identity token"
         if check_no_error_pattern "$error_patterns" "$log_lines_before" "$log_file"; then
             # Also verify auth flow actually completed
@@ -591,8 +561,8 @@ except:
     return 0
 }
 
-# Step 7: Run Server Tests
-echo "=== Step 7: Server Tests ==="
+# Step 5: Run Server Tests
+echo "=== Step 5: Server Tests ==="
 echo "Token mode: $TOKEN_MODE"
 echo ""
 
@@ -628,9 +598,7 @@ echo "=============================================="
 echo "  Final Summary"
 echo "=============================================="
 echo ""
-echo "Patcher:"
-echo "  - Compilation: OK"
-echo "  - JAR patching: OK ($DUAL_CLASSES classes)"
+echo "Agent Build: OK"
 echo ""
 
 EXIT_CODE=0
@@ -675,7 +643,8 @@ echo ""
 echo "Files:"
 [ -f "server_with-tokens.log" ] && echo "  - server_with-tokens.log"
 [ -f "server_no-tokens.log" ] && echo "  - server_no-tokens.log"
-echo "  - HytaleServerPatched.jar"
+echo "  - dualauth-agent.jar"
+echo "  - HytaleServer.jar (unmodified)"
 echo ""
 echo "Data Directories (isolated per test):"
 [ -d "universe_with-tokens" ] && echo "  - universe_with-tokens/"

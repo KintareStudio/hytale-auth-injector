@@ -1,7 +1,7 @@
 {
   "Group": "DualAuth",
   "Name": "DualAuth",
-  "Version": "1.1.5",
+  "Version": "${version}",
   "Authors": [
     {
       "Name": "DualAuth Team",
