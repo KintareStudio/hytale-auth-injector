@@ -39,6 +39,8 @@ jobs:
     outputs:
       version: ${{ steps.get_version.outputs.version }}
       server_jar_hash: ${{ steps.server_hash.outputs.hash }}
+      protocol_crc: ${{ steps.protocol.outputs.crc }}
+      protocol_build: ${{ steps.protocol.outputs.build }}
 
     steps:
       - name: Checkout
@@ -78,6 +80,30 @@ jobs:
           HASH=$(sha256sum HytaleServer.jar | cut -d' ' -f1 | head -c16)
           echo "hash=$HASH" >> $GITHUB_OUTPUT
           echo "Server JAR hash (first 16 chars): $HASH"
+
+      - name: Extract Protocol Constants
+        id: protocol
+        run: |
+          echo "Extracting protocol constants from HytaleServer.jar..."
+          jar xf HytaleServer.jar com/hypixel/hytale/protocol/ProtocolSettings.class 2>/dev/null || true
+          if [ -f com/hypixel/hytale/protocol/ProtocolSettings.class ]; then
+            # Extract PROTOCOL_CRC and PROTOCOL_BUILD_NUMBER via javap
+            JAVAP_OUT=$(javap -c -p com/hypixel/hytale/protocol/ProtocolSettings.class 2>/dev/null || true)
+            # CRC is loaded as ldc/sipush/bipush before putstatic PROTOCOL_CRC
+            CRC=$(echo "$JAVAP_OUT" | grep -B1 "PROTOCOL_CRC" | grep -oE "[-]?[0-9]+" | head -1)
+            BUILD=$(echo "$JAVAP_OUT" | grep -B1 "PROTOCOL_BUILD_NUMBER" | grep -oE "[0-9]+" | head -1)
+            VERSION=$(echo "$JAVAP_OUT" | grep -B1 "PROTOCOL_VERSION" | grep -oE "[0-9]+" | head -1)
+            echo "Protocol CRC: ${CRC:-unknown}"
+            echo "Protocol Build Number: ${BUILD:-unknown}"
+            echo "Protocol Version: ${VERSION:-unknown}"
+            echo "crc=${CRC:-1789265863}" >> $GITHUB_OUTPUT
+            echo "build=${BUILD:-2}" >> $GITHUB_OUTPUT
+            rm -rf com/
+          else
+            echo "::warning::Could not extract ProtocolSettings.class, using defaults"
+            echo "crc=1789265863" >> $GITHUB_OUTPUT
+            echo "build=2" >> $GITHUB_OUTPUT
+          fi
 
       - name: Upload Agent Artifact
         uses: actions/upload-artifact@v4
@@ -262,6 +288,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: ${{ !inputs.skip_boot_test }}
+    env:
+      PROTOCOL_CRC: ${{ needs.build-agent.outputs.protocol_crc }}
+      PROTOCOL_BUILD: ${{ needs.build-agent.outputs.protocol_build }}
 
     steps:
       - name: Checkout

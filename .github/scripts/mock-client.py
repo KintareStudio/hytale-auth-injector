@@ -62,8 +62,8 @@ PACKET_NAMES = {
     17: "PasswordRejected",
 }
 
-PROTOCOL_CRC = 1789265863
-PROTOCOL_BUILD_NUMBER = 2
+DEFAULT_PROTOCOL_CRC = 1789265863
+DEFAULT_PROTOCOL_BUILD_NUMBER = 2
 CLIENT_VERSION = "1.0.0"
 
 
@@ -146,8 +146,8 @@ class ConnectPacket:
                  player_uuid: uuid.UUID,
                  username: str,
                  identity_token: str = None,
-                 protocol_crc: int = PROTOCOL_CRC,
-                 protocol_build: int = PROTOCOL_BUILD_NUMBER,
+                 protocol_crc: int = DEFAULT_PROTOCOL_CRC,
+                 protocol_build: int = DEFAULT_PROTOCOL_BUILD_NUMBER,
                  client_version: str = CLIENT_VERSION,
                  client_type: int = 0,
                  language: str = "en"):
@@ -273,7 +273,9 @@ class MockClientProtocol(QuicConnectionProtocol):
 
 async def test_connection(host: str, port: int, player_uuid: uuid.UUID,
                           username: str, identity_token: str = None,
-                          timeout: float = 10.0) -> dict:
+                          timeout: float = 10.0,
+                          protocol_crc: int = DEFAULT_PROTOCOL_CRC,
+                          protocol_build: int = DEFAULT_PROTOCOL_BUILD_NUMBER) -> dict:
     """Test server connection using QUIC with mTLS client certificate."""
     result = {
         "success": False,
@@ -297,7 +299,7 @@ async def test_connection(host: str, port: int, player_uuid: uuid.UUID,
         config.verify_mode = False
 
         print(f"[INFO] QUIC config: ALPN={config.alpn_protocols}")
-        print(f"[INFO] Protocol CRC: {PROTOCOL_CRC}, Build: {PROTOCOL_BUILD_NUMBER}")
+        print(f"[INFO] Protocol CRC: {protocol_crc}, Build: {protocol_build}")
         print(f"[INFO] Connecting to {host}:{port}...")
 
         async with connect(
@@ -323,6 +325,8 @@ async def test_connection(host: str, port: int, player_uuid: uuid.UUID,
                 player_uuid=player_uuid,
                 username=username,
                 identity_token=identity_token,
+                protocol_crc=protocol_crc,
+                protocol_build=protocol_build,
             )
 
             packet_data = connect_packet.encode()
@@ -392,6 +396,12 @@ def main():
     parser.add_argument("--token", help="F2P identity token")
     parser.add_argument("--token-file", help="File containing identity token")
     parser.add_argument("--timeout", type=float, default=10.0, help="Connection timeout")
+    parser.add_argument("--protocol-crc", type=int,
+                        default=int(os.environ.get('PROTOCOL_CRC', str(DEFAULT_PROTOCOL_CRC))),
+                        help="Protocol CRC (or set PROTOCOL_CRC env var)")
+    parser.add_argument("--protocol-build", type=int,
+                        default=int(os.environ.get('PROTOCOL_BUILD', str(DEFAULT_PROTOCOL_BUILD_NUMBER))),
+                        help="Protocol build number (or set PROTOCOL_BUILD env var)")
     args = parser.parse_args()
 
     player_uuid = uuid.UUID(args.uuid) if args.uuid else uuid.uuid4()
@@ -409,15 +419,16 @@ def main():
     print(f"UUID: {player_uuid}")
     print(f"Username: {args.username}")
     print(f"Has Token: {identity_token is not None}")
-    print(f"Protocol CRC: {PROTOCOL_CRC}")
-    print(f"Protocol Build: {PROTOCOL_BUILD_NUMBER}")
+    print(f"Protocol CRC: {args.protocol_crc}")
+    print(f"Protocol Build: {args.protocol_build}")
     print(f"Timestamp: {datetime.now().isoformat()}")
     print("=" * 60)
     print()
 
     result = asyncio.run(test_connection(
         args.host, args.port, player_uuid,
-        args.username, identity_token, args.timeout
+        args.username, identity_token, args.timeout,
+        args.protocol_crc, args.protocol_build
     ))
 
     print()
