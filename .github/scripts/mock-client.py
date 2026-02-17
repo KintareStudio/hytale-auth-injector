@@ -166,7 +166,7 @@ class ConnectPacket:
 
         buf = bytearray()
         buf.append(null_bits)
-        buf.extend(struct.pack('<I', self.protocol_crc))
+        buf.extend(struct.pack('<i', self.protocol_crc))
         buf.extend(struct.pack('<I', self.protocol_build))
         buf.extend(self.client_version.encode('ascii')[:20].ljust(20, b'\x00'))
         buf.append(self.client_type)
